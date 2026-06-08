@@ -34,8 +34,11 @@ rotation $Q \in O(3)$ as a real spherical harmonic of degree $l$,
    \hat Q\, \psi_{i, nlm} = \sum_{m'} D^{l}_{m'm}(Q)\, \psi_{i, nlm'} ,
 ```
 
-with $D^l(Q)$ the (real) Wigner matrix of degree $l$ (including the parity
-factor $(-1)^l$ under inversion). The matrix elements
+with $D^l(Q)$ the real Wigner matrix of degree $l$ (including the parity
+factor $(-1)^l$ under inversion). Throughout this document we use **real
+spherical harmonics** $Y_{lm}$ exclusively; all CG coefficients and Wigner
+matrices are for the real-harmonic basis (EquivariantTensors handles the
+construction of these coupling matrices). The matrix elements
 
 ```math
   H_{i n l m, j n' l' m'} = \langle \psi_{i, nlm} | \hat H | \psi_{j, n'l'm'} \rangle, \qquad
@@ -52,11 +55,10 @@ via Clebsch--Gordan (CG) coefficients (§4).
 We split the construction into two essentially independent pieces:
 
 * **Overlap $S$.** Because $S$ is a strictly two-center, geometry-only
-  quantity (it depends only on the relative position $\mathbf r_j - \mathbf
-  r_i$ and the orbital content of the two sites, not on the chemical
-  environment), we represent it with a *purely two-center* model: an
-  equivariant expansion in the bond vector $\mathbf r_{ij} = \mathbf r_j -
-  \mathbf r_i$ alone (§6). In particular $S_{ii} $ is just the fixed
+  quantity (it depends only on the relative position $\mathbf r_{ji} =
+  \mathbf r_j - \mathbf r_i$ and the orbital content of the two sites, not on
+  the chemical environment), we represent it with a *purely two-center* model:
+  an equivariant expansion in the bond vector $\mathbf r_{ji}$ alone (§6). In particular $S_{ii} $ is just the fixed
   on-site overlap (orthonormal basis, or a fixed atomic-orbital Gram matrix),
   and $S_{ij}$, $i\neq j$, is a sum of two-center ("Slater--Koster"-like)
   terms.
@@ -70,7 +72,7 @@ We split the construction into two essentially independent pieces:
       (§5);
     * **off-site blocks** $H_{ij}$, $i \neq j$, are represented as an
       equivariant function of the environments of *both* sites $i,j$ **and**
-      of the bond $\mathbf r_{ij}$ — effectively a two-center ACE expansion in the sense of Nigam *et al.* (§7).
+      of the bond $\mathbf r_{ji}$ — effectively a two-center ACE expansion in the sense of Nigam *et al.* (§7).
 
 Both pieces reuse the same fundamental building blocks: a one-particle basis
 $\phi_{nlm} = R_{nl} Y_{lm}$, atomic-density features $A_{i,nlm}$ obtained by
@@ -98,11 +100,13 @@ r_{ji} = \mathbf r_j - \mathbf r_i$) into the (one-particle, $\nu=1$)
 *atomic density features*
 
 ```math
-   A_{i, nlm} = \sum_{j \in \mathcal N_i} z_{j}\, \phi_{nlm}(\mathbf r_{ji}),
+   A_{i, nlm} = \sum_{j \in \mathcal N_i} \phi_{nlm}(\mathbf r_{ji}).
 ```
 
-where $z_j$ encodes the chemical species of $j$ (and possibly the species of
-$i$, in the usual ACE "bond basis" sense). Under rotation/inversion of the
+The chemical species of the neighbor $j$ is encoded implicitly in the radial
+channel index $n$: each species contributes its own species-resolved set of
+radial basis functions $R_{nl}$, so the index $n$ runs over all
+(species, radial-order) pairs simultaneously. Under rotation/inversion of the
 whole structure, $A_{i,nlm}$ transforms exactly like $\phi_{nlm}$, i.e. as
 $Y_{lm}$:
 
@@ -216,22 +220,26 @@ as in a standard ACE potential. We therefore propose
 ```math
    H_{i;\, nlm,\, n'l'm'}
    \;=\; \sum_{\lambda=|l-l'|}^{l+l'}
-   \texttt{transform}_\lambda\Big[ \sum_{q} w^{(a_i; nl, n'l'; \lambda)}_{q}\;
+   \texttt{transform}_\lambda\Big[ \sum_{q} w^{(nl, n'l'; \lambda)}_{q}\;
         B^{(\cdot)\, \lambda \mu}_{i, q} \Big]_{m m'} ,
 ```
 
 i.e. for each shell pair $(nl, n'l')$ and each admissible coupled angular
 momentum $\lambda$, the corresponding $\lambda$-equivariant block of $H_{ii}$
-is a linear combination — with scalar, $\lambda$- and species-($a_i$,
-the chemical element of $i$)-dependent weights $w_q$ — of equivariant ACE
-basis functions $B_{i,q}^{(\cdot)\lambda \mu}$ evaluated on the environment of
-$i$, recoupled back into the $(m,m')$ block via $\texttt{transform}_\lambda$.
+is a linear combination — with scalar weights $w_q$ depending on $\lambda$
+and the shell pair — of equivariant ACE basis functions
+$B_{i,q}^{(\cdot)\lambda \mu}$ evaluated on the environment of $i$, recoupled
+back into the $(m,m')$ block via $\texttt{transform}_\lambda$. Separate weight
+sets are maintained per species of site $i$ (implicitly, since different
+species carry different orbital lists and species-resolved radial channels).
 
 ### 5.2 Practical remarks
 
 * **Selection rules.** Only basis functions $B^{(\cdot)\lambda \bullet}_i$ with
   the matching parity $\sigma = (-1)^{l + l' + \lambda}$ contribute (improper
-  vs. proper tensor); this halves the number of independent weight sets.
+  vs. proper tensor); this halves the number of independent weight sets. This
+  selection rule follows from the transformation properties of atomic orbitals
+  under inversion; it should be verified in the test suite (see §12).
 * **Hermiticity.** $H_{ii}$ is Hermitian, and (working with real orbitals) in
   fact symmetric: $H_{i;nlm,n'l'm'} = H_{i;n'l'm',nlm}$. It is therefore
   sufficient to build models for lexicographically-ordered shell pairs $(nl)
@@ -256,15 +264,16 @@ defines the target block; what *is* free is which members of $\mathcal B_i$
 (which $(\nu, \mathbf v)$, i.e. which radial/angular "shapes" of the
 environment) enter the linear combination for each $\lambda$.
 
-## 6. Two-center (bond) descriptors $\phi_{nlm}(\mathbf r_{ij})$
+## 6. Two-center (bond) descriptors $\phi^{\rm b}_{nlm}(\mathbf r_{ji})$
 
 For both $S_{ij}$ and the off-site part of $H_{ij}$ we need an equivariant
 description of the *bond* itself. We reuse the same functional form as the
-one-particle basis, evaluated at the bond vector,
+one-particle basis, evaluated at the bond vector $\mathbf r_{ji} = \mathbf
+r_j - \mathbf r_i$,
 
 ```math
-   \phi^{\rm b}_{nlm}(\mathbf r_{ij}) = R^{\rm b}_{nl}(|\mathbf r_{ij}|)\, Y_{lm}(\hat{\mathbf r}_{ij}),
-   \qquad |\mathbf r_{ij}| \le r_{\rm cut}^{\rm b},
+   \phi^{\rm b}_{nlm}(\mathbf r_{ji}) = R^{\rm b}_{nl}(|\mathbf r_{ji}|)\, Y_{lm}(\hat{\mathbf r}_{ji}),
+   \qquad |\mathbf r_{ji}| \le r_{\rm cut}^{\rm b},
 ```
 
 i.e. the $\nu=0$-neighbour, two-center feature
@@ -272,14 +281,14 @@ $\langle n00 | \mathbf r_{ji}; g\rangle$ generalised to $l>0$ — the building
 block of the "two-centers, one-neighbour" features of Nigam *et al.* (their
 eqs. (10)-(11)). We deliberately use a *separate* radial basis $R^{\rm b}_{nl}$
 and cutoff $r^{\rm b}_{\rm cut}$, possibly different from the ones used to
-build $A_{i,nlm}$ — see the discussion in §8.
+build $A_{i,nlm}$ — see the discussion in §9.
 
 ## 7. Off-site blocks $H_{ij}$, $i \neq j$
 
 ### 7.1 General form
 
 For $i \neq j$, $H_{ij}$ depends on (i) the environment of $i$, (ii) the
-environment of $j$, and (iii) the bond $\mathbf r_{ij}$ connecting them — a
+environment of $j$, and (iii) the bond $\mathbf r_{ji}$ connecting them — a
 genuine *three-piece*, "two-center-plus-environments" object, in the spirit of
 Nigam *et al.*'s $N$-center construction (their two-center, one-neighbour
 features, eq. (11), generalised to higher correlation order on each side and
@@ -293,7 +302,7 @@ first form a triple tensor product
     \langle \kappa \nu; l_b \mu_b | \Lambda M \rangle\;
     B^{(\cdot) L_1 \mu_1}_{i \mathbf v_1}\;
     B^{(\cdot) L_2 \mu_2}_{j \mathbf v_2}\;
-    \phi^{\rm b}_{n_b l_b \mu_b}(\mathbf r_{ij}),
+    \phi^{\rm b}_{n_b l_b \mu_b}(\mathbf r_{ji}),
 ```
 
 i.e. couple an equivariant feature $B_i^{L_1}$ of the environment of $i$, an
@@ -310,17 +319,18 @@ bases). The off-site block is then
    H_{ij;\, nlm,\, n'l'm'}
    = \sum_{\Lambda = |l-l'|}^{l+l'}
      \texttt{transform}_\Lambda\Big[
-        \sum_{q} w^{(a_i a_j; nl, n'l'; \Lambda)}_{q}\;
+        \sum_{q} w^{(nl, n'l'; \Lambda)}_{q}\;
         T^{(\Lambda \bullet)}_{ij,\, q}
      \Big]_{mm'},
 ```
 
 with $q$ ranging over the retained combinations $(\mathbf v_1, \mathbf v_2,
-n_b l_b, \kappa)$, and weights depending on the *ordered* species pair $(a_i,
-a_j)$ and on the shell pair $(nl, n'l')$. This is the direct off-site
-generalisation of eq. (23)/(28) of Nigam *et al.*, with the pair feature
-$A_{ii'}$ there replaced here by the explicit triple coupling
-$B_i \otimes B_j \otimes \phi^{\rm b}_{ij}$.
+n_b l_b, \kappa)$. Separate weight sets are maintained per ordered shell-pair
+type $(nl, n'l')$; species dependence enters through the species-resolved
+radial channels in $\mathcal B_i$, $\mathcal B_j$, and $\phi^{\rm b}$.
+This is the direct off-site generalisation of eq. (23)/(28) of Nigam *et
+al.*, with the pair feature $A_{ii'}$ there replaced here by the explicit
+triple coupling $B_i \otimes B_j \otimes \phi^{\rm b}_{ji}$.
 
 ### 7.2 Coupling strategy: direct three-way contraction
 
@@ -342,15 +352,17 @@ $\Lambda \in [|l-l'|, l+l']$ for each target shell pair), so feature selection
 is applied at the coupling stage — before any arithmetic on feature values.
 The intermediate channel $\kappa$ never needs to be materialized.
 
-This approach is strictly preferable to coupling in a fixed sequential order
-(e.g. $B_i \otimes \phi^{\rm b}$ first, then with $B_j$, or $B_i \otimes B_j$
-first, then with $\phi^{\rm b}$): sequential orderings impose an arbitrary
-structural bias and generate intermediate objects whose size is set by the
-intermediate coupling rather than by the actually-needed output channels. The
-direct three-way coupling is the most general linear model within the chosen
-feature space, and the coupling-matrix sparsity (imposed by the CG triangle
-rules $|L_1 - L_2| \le \kappa \le L_1 + L_2$, $|\kappa - l_b| \le \Lambda
-\le \kappa + l_b$) keeps the contraction cost modest.
+This approach is *equivalent* to any sequential two-step coupling (every
+three-way coupling can be written as a sum over intermediate channels $\kappa$
+of two successive CG steps), but avoids materializing the intermediate tensor:
+the coupling matrix $\mathbf C^{(\Lambda)}$ implicitly sums over all
+admissible $\kappa$ internally. The practical advantage over fixing a
+sequential coupling order is that the coupling matrix is constructed *after*
+specifying which output channels are needed, so intermediate objects are never
+formed at sizes larger than the required output. The coupling-matrix sparsity
+(imposed by the CG triangle rules $|L_1 - L_2| \le \kappa \le L_1 + L_2$,
+$|\kappa - l_b| \le \Lambda \le \kappa + l_b$) keeps the contraction cost
+modest.
 
 One implementation-level optimization is worth noting: since $B_i^{L_1}$
 appears in all bonds $(i,j)$ incident on atom $i$, it can be precomputed once
@@ -361,38 +373,54 @@ coupling matrix per bond, is an evaluation-order choice that does not affect
 the model itself — the coupling matrix and the selected feature set are
 identical either way.
 
-### 7.3 Index-permutation (Hermiticity) symmetry
+### 7.3 Hermiticity and bond-ordering symmetry
 
-$H$ is Hermitian (and, with real orbitals, $H_{ji} = H_{ij}^{T}$), so the model
-must satisfy
+With real orbitals, $H$ is real symmetric, so the model must satisfy
 
 ```math
    H_{ij;\, nlm,\, n'l'm'} = H_{ji;\, n'l'm',\, nlm} .
 ```
 
-Following Nigam *et al.* (eqs. (19)-(20) and surrounding discussion), we
-distinguish:
+The challenge is that the bond neighbor list produces ordered pairs $(i, j)$
+without a guaranteed canonical ordering, and the model input
+$(B_i, B_j, \phi^{\rm b}_{ji})$ changes non-trivially when $i$ and $j$ are
+swapped: $\mathbf r_{ji} \to \mathbf r_{ij} = -\mathbf r_{ji}$, picking up
+$(-1)^{l_b}$ on each bond harmonic, while $B_i$ and $B_j$ swap roles.
 
-* **cross-species pairs** ($a_i \neq a_j$): we may fix a canonical order of
-  the species (e.g. atomic number) and only ever build/evaluate $H_{ij}$ for
-  $i$ the heavier atom; Hermiticity then determines $H_{ji}$ without any
-  additional modelling.
-* **same-species, off-diagonal pairs** ($a_i = a_j$, $i \neq j$): there is no
-  canonical order, so the feature triple $(B_i, B_j, \phi^{\rm b}_{ij})$ must
-  be combined into manifestly symmetric/antisymmetric combinations under
-  $i \leftrightarrow j$ (which simultaneously sends $\mathbf r_{ij} \to
-  -\mathbf r_{ij} = \mathbf r_{ji}$, picking up a parity factor
-  $(-1)^{l_b}$ on the bond harmonics), e.g.
-  ```math
-     T^{(\Lambda \bullet)}_{\{ij\},\, q}{}^{\pm}
-        = T^{(\Lambda \bullet)}_{ij,\, q} \pm T^{(\Lambda \bullet)}_{ji,\, q} ,
-  ```
-  and only the combination with the correct symmetry contributes to a given
-  (lexicographically-ordered) shell-pair block, exactly mirroring the
-  symmetric/antisymmetric pair-feature construction of Nigam *et al.*, eq.
-  (16)/(20). As they note, Hermiticity then forces some of these
-  symmetry-adapted blocks to vanish identically — a useful, free consistency
-  check on the implementation.
+We adopt the approach of Zhang *et al.* (arXiv:2111.13736, §II.B): build the
+model for all ordered bonds $(i,j)$ in the bond neighbor list using a
+consistent bond-vector convention ($\mathbf r_{ji} = \mathbf r_j - \mathbf
+r_i$ throughout), assemble the full $H$ matrix, and then **symmetrize
+post-hoc**:
+
+```math
+   H \;\leftarrow\; \tfrac{1}{2}(H + H^{T}).
+```
+
+For a linear model this is perfectly well-defined: the symmetrized model is
+still linear and equivariant, with effective weights that are the average of
+the original weights and their transpose-conjugate. Crucially, no canonical
+ordering of the bond pairs is required, and the same weight set is used for
+both orderings of a given pair.
+
+For **cross-species** pairs (different element types at $i$ and $j$), the
+weight sets for the two orderings are in principle independent (different
+orbital lists at each end), so the post-hoc symmetrization is the most
+straightforward way to enforce consistency. Alternatively, one may fix a
+canonical species ordering (e.g. by element position in the orbital list) and
+only model one direction, obtaining the other by transposition — this halves
+the number of weight sets to fit and is the approach of Nigam *et al.*
+
+An alternative to post-hoc symmetrization for **same-species** pairs is the
+explicit feature-level symmetrization of Nigam *et al.* (arXiv:2109.12083,
+eqs. (16)/(20)), which builds symmetric/antisymmetric feature combinations
+$T^{(\Lambda\bullet),\pm}_{ij} = T^{(\Lambda\bullet)}_{ij} \pm
+T^{(\Lambda\bullet)}_{ji}$ directly. This enforces Hermiticity at the feature
+level, and the resulting symmetry-selection rules (which blocks must vanish
+identically) provide useful implementation tests (see §12). The full symmetry
+analysis — how $T^{(\Lambda)}_{ji,q}$ relates to $T^{(\Lambda)}_{ij,q}$ in
+terms of CG phases and the $(-1)^{l_b}$ bond-flip factor — is deferred to the
+implementation stage.
 
 ## 8. The overlap matrix $S$
 
@@ -406,8 +434,8 @@ the bond descriptor,
    S_{ij;\, nlm,\, n'l'm'}
      = \sum_{\Lambda=|l-l'|}^{l+l'}
        \texttt{transform}_\Lambda\Big[
-         \sum_{q} u^{(a_i a_j; nl, n'l'; \Lambda)}_q\;
-         \phi^{\rm b}_{n_q l_q \bullet}(\mathbf r_{ij})
+         \sum_{q} u^{(nl, n'l'; \Lambda)}_q\;
+         \phi^{\rm b}_{n_q l_q \bullet}(\mathbf r_{ji})
        \Big]_{mm'}, \qquad i \neq j,
 ```
 
@@ -415,9 +443,8 @@ i.e. a genuinely "two-center"/Slater--Koster-like expansion: for each
 admissible $\Lambda$, a linear combination of bond-harmonics
 $\phi^{\rm b}_{n_q l_q \Lambda \bullet}$ (so $l_q = \Lambda$ — no internal CG
 coupling is needed because there is only one tensorial object), recoupled into
-the $(m,m')$ block. (Exactly as for $H$, Hermiticity / index-exchange symmetry
-must be enforced for same-species pairs, §7.3, and a canonical species
-ordering used for cross-species pairs.) The on-site part $S_{ii}$ is either
+the $(m,m')$ block. (Exactly as for $H$, Hermiticity is enforced by post-hoc symmetrization
+$S \leftarrow \frac{1}{2}(S + S^T)$, following §7.3.) The on-site part $S_{ii}$ is either
 the identity (orthonormal basis) or a fixed, geometry-independent Gram matrix
 of the atomic-orbital basis (which can typically be computed analytically and
 needs no learning at all).
@@ -442,7 +469,7 @@ radial functions and cutoff radius:
 
 * $\phi^{\rm b}_{nlm}(\mathbf r) = R^{\rm b}_{nl}(|\mathbf r|)\,Y_{lm}(\hat{\mathbf r})$,
   $|\mathbf r| \le r_{\rm cut}^{\rm b}$ — the **bond basis**, used to embed
-  the bond vector $\mathbf r_{ij}$ in the off-site features $T^{(\Lambda)}_{ij}$
+  the bond vector $\mathbf r_{ji}$ in the off-site features $T^{(\Lambda)}_{ij}$
   and in the two-center overlap model $S_{ij}$. The cutoff $r_{\rm cut}^{\rm b}$
   sets the range beyond which all off-site blocks are taken to vanish, and is
   typically controlled by the decay of orbital overlap / hopping integrals.
@@ -457,7 +484,7 @@ parametric family (e.g. both polynomial envelopes) but are fitted/truncated
 independently, with their own $(n_{\max}, l_{\max})$ truncations.
 
 One consequence worth noting: an atom $j$ with $r_{\rm cut}^{\rm b} <
-|\mathbf r_{ij}| \le r_{\rm cut}^{\rm on}$ contributes to the environment
+|\mathbf r_{ji}| \le r_{\rm cut}^{\rm on}$ contributes to the environment
 $\mathcal B_i$ (and hence to the on-site model for $H_{ii}$) but has a
 vanishing off-site block $H_{ij} = 0$. This is physically reasonable —
 distant neighbours shape the local electronic structure without having
@@ -470,30 +497,47 @@ At model-construction time the user specifies:
 
 * **Orbital list**: the sequence of shells $(nl)$ present at each species, e.g.
   $(1s, 2s, 2p, 3d, \dots)$. This determines the target block types
-  $(a_i nl; a_j n'l')$ and, in particular, the maximum orbital angular momentum
+  $(nl; n'l')$ and, in particular, the maximum orbital angular momentum
   $l_{\max}^{\rm orb}$ — which in turn fixes the range of CG coupling channels
   $\Lambda \in [|l-l'|, l+l']$ needed in the transform steps.
 
-* **Environment basis** (used to build $A_{i,nlm}$ and $\mathcal B_i$):
+* **Environment embedding** (used to build $A_{i,nlm}$ and $\mathcal B_i$):
   - $n_{\max}$, $l_{\max}$ — radial and angular truncations of $\phi_{nlm}$
-  - `totaldegree` — a total-degree truncation combining $n$ and $l$ to control
-    basis size
   - $r_{\rm cut}^{\rm on}$ — environment cutoff radius
-  - $\nu_{\max}$ — maximum correlation order (body order minus one) of $\mathcal B_i$
 
-* **Bond basis** (used to embed $\mathbf r_{ij}$ in off-site features and $S_{ij}$):
+* **Bond embedding** (used to embed $\mathbf r_{ji}$ in off-site features and $S_{ij}$):
   - $n_{\max}^{\rm b}$, $l_{\max}^{\rm b}$ — radial and angular truncations of
     $\phi^{\rm b}_{nlm}$
   - $r_{\rm cut}^{\rm b}$ — bond cutoff radius
 
-Note that $l_{\max}^{\rm b}$ must be at least $l_{\max}^{\rm orb}$ (since the
-bond basis must be able to contribute to every admissible $\Lambda$ channel), but
-may be larger if higher-angular-momentum bond features are found useful.
-The equivariant ACE basis $\mathcal B_i$ is coupled up to
-$L_{\max} = l_{\max}^{\rm orb} + l_{\max}^{\rm b}$ (the maximum $\Lambda$ that
-can arise from coupling a bond descriptor with an environment feature in the
-off-site model), though in practice a tighter truncation is applied via the
-total-degree criterion.
+* **On-site many-body basis**   
+  - correlation order
+  - total degree (scalar or list of values, one for each order)
+
+* **Off-site many-body basis** 
+  - correlation order $\nu_{\rm off}$: the effective total order combining $B_i$,
+    $B_j$, and the bond descriptor. The bond counts as one unit, so the
+    construction enumerates all $(\nu_i, \nu_j)$ pairs with $\nu_i + \nu_j \le
+    \nu_{\rm off} - 1$, and $B_i^{(\nu_i)} \otimes B_j^{(\nu_j)} \otimes
+    \phi^{\rm b}$ forms the off-site feature.
+  - total degree (scalar or list of values, one for each order)
+
+Implementation notes: 
+- $\mathcal B_i$ is built **once per site** and shared between the on-site and
+  off-site models. The effective truncation of $\mathcal B_i$ is therefore the
+  union (i.e. element-wise maximum) of what the on-site spec and the off-site
+  spec individually require. Model construction should resolve this automatically.
+- The equivariant ACE basis $\mathcal B_i$ is coupled up to $L_{\max}$ (the
+  maximum $\Lambda$ that can arise from the orbital list specification); this is
+  determined automatically.
+- Note that $l_{\max}^{\rm b}$ must be at least $l_{\max}^{\rm orb}$ (since the
+  bond basis must reach every admissible $\Lambda$ channel), but may be larger if
+  higher-angular-momentum bond features improve numerical resolution; a sanity
+  check should be added during model construction.
+- The max correlation order and total degrees for the on-site and off-site bases
+  combined can be used to work backwards and determine exactly which
+  $A$-features $(n_t, l_t, m_t)_{t=1,\dots}$ are needed, so basis construction
+  should be automated at model-construction time.
 
 ## 11. Network structure
 
@@ -507,8 +551,8 @@ neural-network layer graph. The forward pass for a single configuration is:
 2. **Embedding** (fully parallel):
    - (i) $R_{nl}(r_{ji})$ for all environment pairs $(i,j)$
    - (ii) $Y_{lm}(\hat{\mathbf r}_{ji})$ for all environment pairs
-   - (iii) $R^{\rm b}_{nl}(r_{ij})$ for all bond pairs $(i,j)$
-   - (iv) $Y_{lm}(\hat{\mathbf r}_{ij})$ for all bond pairs
+   - (iii) $R^{\rm b}_{nl}(r_{ji})$ for all bond pairs $(i,j)$
+   - (iv) $Y_{lm}(\hat{\mathbf r}_{ji})$ for all bond pairs
    Use Polynomials4ML.jl for the polynomial basis sets, but they need to be 
    correctly transformed, look at ACEpotentials.jl for how this is done. 
    Consider bringing radial basis constructiong into EquivariantTensors.jl 
@@ -517,7 +561,7 @@ neural-network layer graph. The forward pass for a single configuration is:
 3. **Feature construction** (parallel branches):
    - (i) **ACE layer**: pool and symmetrize to produce $A_{i,nlm}$ and
      then $\mathcal B_i = \{B_{i\mathbf v}^{(\nu)LM}\}$ at every site
-   - (ii) **Bond embedding**: form $\phi^{\rm b}_{nlm}(\mathbf r_{ij})$ at
+   - (ii) **Bond embedding**: form $\phi^{\rm b}_{nlm}(\mathbf r_{ji})$ at
      every bond pair from outputs (iii)+(iv); this is a standard tensor 
      product layer. 
    EquivariantTensors.jl has all the utilities to construct this, look 
@@ -531,7 +575,7 @@ neural-network layer graph. The forward pass for a single configuration is:
      $\texttt{transform}_\Lambda$ to produce $H_{ii}$
    - (ii) **Off-site**: for each bond pair $(i,j)$, apply the three-way
      EquivariantTensors coupling matrix to
-     $(B_i^{L_1}, B_j^{L_2}, \phi^{\rm b}_{ij})$, contract with weights,
+     $(B_i^{L_1}, B_j^{L_2}, \phi^{\rm b}_{ji})$, contract with weights,
      and apply $\texttt{transform}_\Lambda$ to produce $H_{ij}$ and $S_{ij}$
    - (iii) On-site overlap : analogous, but just constant
    - (iv) Off-site overlap : analogous, built only from \phi_{nlm}^{\rm b}
@@ -544,7 +588,44 @@ concentrated.
 
 During development decide whether 4. should be split into 4. Matrix block assembly; 5. global matrix assembly. 
 
-## 12. Out of scope  
+## 12. Symmetry tests
+
+The following symmetry properties must hold exactly (up to floating-point
+precision) for any correct implementation and should each have a dedicated
+test:
+
+1. **Rotational equivariance of $H$ and $S$**: for a random rotation $Q \in
+   SO(3)$, the matrix assembled for the rotated configuration must equal the
+   one assembled for the original configuration conjugated by the block-Wigner
+   matrix $\mathcal D(Q) = \mathrm{diag}(D^{l_1}(Q), D^{l_2}(Q), \dots)$.
+
+2. **Inversion equivariance**: under $Q \in O(3)$ with $\det Q = -1$, the
+   same conjugation rule holds with the additional $(-1)^l$ parity factors on
+   each orbital block. Parity selection rules (§5.2) should be verified by
+   checking that the predicted blocks for a structure and its inversion image
+   differ by the expected sign pattern.
+
+3. **Hermitian symmetry**: $H = H^T$ and $S = S^T$ after post-hoc
+   symmetrization (§7.3), for both on-site and off-site blocks.
+
+4. **Translational invariance**: shifting all atomic positions by a constant
+   vector leaves $H$ and $S$ unchanged.
+
+5. **Permutation equivariance of atom labels**: relabelling the atoms
+   permutes the rows and columns of $H$ (and $S$) accordingly, without
+   changing the numerical values of the matrix elements.
+
+6. **Same-species off-diagonal blocks that must vanish**: by Hermitian
+   symmetry and parity selection, certain coupled-basis components
+   $H^{\lambda\mu}_{nl;nl}$ with odd $\lambda$ (on diagonal shell pairs,
+   $n=n'$, $l=l'$) must be identically zero. These should be checked.
+
+7. **Cutoff smoothness**: the energy (or Frobenius norm of $H$) as a function
+   of a bond length that crosses $r_{\rm cut}^{\rm b}$ or $r_{\rm cut}^{\rm
+   on}$ should be $C^p$ continuous, where $p$ is the order of the envelope
+   function used.
+
+## 13. Out of scope
 
 The following questions concern training and fitting strategy rather than
 model architecture, and are deferred to a separate discussion:
@@ -559,3 +640,40 @@ model architecture, and are deferred to a separate discussion:
   linear regression, symmetry-adapted GPR, and equivariant neural-network
   readouts. The choice among these will be made once the feature layer is
   implemented and benchmarked.
+
+## 14. Proposed file structure
+
+```
+ACEoperators.jl/
+├── src/
+│   ├── ACEoperators.jl          # top-level module, re-exports public API
+│   │
+│   ├── linear2c/
+│   │   ├── model.jl             # model struct, inference interface
+│   │   ├── utils.jl             # neighbour list helpers, block indexing
+│   │   ├── hypers.jl            # hyper parameter defaults and heuristics 
+│   │   ├── params.jl            # model parameter juggling
+│   │   ├── coupling.jl          # coupling construction functions
+│   │   ├── basis.jl             # basis construction functions 
+│
+└── test/
+│   │
+|   ├── runtests.jl
+│   ├── linear2c/
+|       ├── test_symmetry.jl         # all symmetry tests from §12
+|       ├── test_onsite.jl
+|       ├── test_offsite.jl
+|       └── test_overlap.jl
+```
+
+Key design notes:
+- reuse ACE layers from ACEpotentials.jl / EquivariantTensors.jl / Polynomials4ML.jl wherever possible.
+- `coupling.jl` implements the wigner-eckhardt `transform_λ` step (§4) and is
+  shared by on-site, off-site, and overlap models; double-check that this isn't already available in EquivariantTensors.jl, which is a more natural home
+- `model.jl` owns the final assembly loop and the post-hoc
+  symmetrization $H \leftarrow \frac{1}{2}(H + H^T)$ for now, this can be revisited, could be a separate file if it gets too long 
+- The model struct exposes a Lux.jl-compatible layer so they can be
+  composed in a standard `Chain` for the forward pass described in §11.
+- Consider whether the structure -> neighbourlist -> graph should be part of the model or better done outside and make the graph the input to the model? 
+- during model construction add a sanity check that the hyperparameters are sensible
+- PBC are implicitly treated via the neighbourlist
