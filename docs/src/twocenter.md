@@ -502,19 +502,28 @@ neural-network layer graph. The forward pass for a single configuration is:
 
 1. **Neighbour lists**: compute the environment neighbour list (cutoff
    $r_{\rm cut}^{\rm on}$) and the bond neighbour list (cutoff
-   $r_{\rm cut}^{\rm b}$).
+   $r_{\rm cut}^{\rm b}$). Use NeighbourLists.jl for this and the relevant EquivariantTensors.jl extension to convert a neighbourlist to a graph.
 
 2. **Embedding** (fully parallel):
    - (i) $R_{nl}(r_{ji})$ for all environment pairs $(i,j)$
    - (ii) $Y_{lm}(\hat{\mathbf r}_{ji})$ for all environment pairs
    - (iii) $R^{\rm b}_{nl}(r_{ij})$ for all bond pairs $(i,j)$
    - (iv) $Y_{lm}(\hat{\mathbf r}_{ij})$ for all bond pairs
+   Use Polynomials4ML.jl for the polynomial basis sets, but they need to be 
+   correctly transformed, look at ACEpotentials.jl for how this is done. 
+   Consider bringing radial basis constructiong into EquivariantTensors.jl 
+   or into a new package ACEradials.jl for shared functionality. 
 
 3. **Feature construction** (parallel branches):
    - (i) **ACE layer**: pool and symmetrize to produce $A_{i,nlm}$ and
      then $\mathcal B_i = \{B_{i\mathbf v}^{(\nu)LM}\}$ at every site
    - (ii) **Bond embedding**: form $\phi^{\rm b}_{nlm}(\mathbf r_{ij})$ at
-     every bond pair from outputs (iii)+(iv)
+     every bond pair from outputs (iii)+(iv); this is a standard tensor 
+     product layer. 
+   EquivariantTensors.jl has all the utilities to construct this, look 
+   at its code, tests and examples, also ACEpotentials.jl has good usage 
+   examples. But I'm unsure whether the standard tensor product is 
+   readily available. 
 
 4. **Matrix assembly** (parallel branches):
    - (i) **On-site**: for each site $i$, contract $\mathcal B_i$ with
@@ -526,6 +535,7 @@ neural-network layer graph. The forward pass for a single configuration is:
      and apply $\texttt{transform}_\Lambda$ to produce $H_{ij}$ and $S_{ij}$
    - (iii) On-site overlap : analogous, but just constant
    - (iv) Off-site overlap : analogous, built only from \phi_{nlm}^{\rm b}
+   This is a little more new and may need some iteration. 
 
 Steps 3(i) and 3(ii) can run in parallel since both depend only on step 2
 outputs; steps 4(i) and 4(ii) can likewise run in parallel. The off-site
@@ -534,7 +544,7 @@ concentrated.
 
 During development decide whether 4. should be split into 4. Matrix block assembly; 5. global matrix assembly. 
 
-## 12. Out of scope
+## 12. Out of scope  
 
 The following questions concern training and fitting strategy rather than
 model architecture, and are deferred to a separate discussion:
