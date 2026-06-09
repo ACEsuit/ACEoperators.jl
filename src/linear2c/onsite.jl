@@ -44,7 +44,7 @@ construction.
 struct OnsiteModel{TE}
    orbitals::OrbitalBasis
    env::TE                          # EnvBasis
-   couplings::Dict{Tuple{Int,Int}, BlockCoupling}
+   couplings::Dict{Tuple{Int,Int}, BlockCoupling{Float64}}
    entries::Vector{OnsiteEntry}
    group::Dict{Int, Vector{Int}}    # center-species index -> entry indices
    nparam::Int
@@ -57,7 +57,7 @@ function OnsiteModel(orbitals::OrbitalBasis;
    Lmax = maxL(orbitals)
    env = EnvBasis(orbitals._i2z; Lmax = Lmax, ORD = ORD,
                   totaldegree = totaldegree, rng = rng)
-   couplings = Dict{Tuple{Int,Int}, BlockCoupling}()
+   couplings = Dict{Tuple{Int,Int}, BlockCoupling{Float64}}()
    entries = OnsiteEntry[]
    w = 0
    for iz = 1:length(orbitals._i2z)
