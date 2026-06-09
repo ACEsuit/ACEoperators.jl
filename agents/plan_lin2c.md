@@ -22,7 +22,7 @@ review** — the unit tests in particular are to be inspected before moving on.
 |-------|-------------|-------------------|
 | 0 ✅ | scaffolding, `coupling.jl` (`transform_λ`), block index bookkeeping | CG/Wigner-Eckart conventions |
 | 1 ✅ | **Overlap `S`** model (on-site const + off-site bond-only) end-to-end, with rotation/inversion/Hermiticity tests | graph→bond-embedding→block-assembly→symmetrize loop |
-| 2 | **On-site `H_ii`** model (one-center ACE + `transform_λ`) | ACE-feature reuse, parity selection |
+| 2 ✅ | **On-site `H_ii`** model (one-center ACE + `transform_λ`) | ACE-feature reuse, parity selection |
 | 3 | **Three-way coupling** `B_i⊗B_j⊗φ_b→Λ` in isolation + equivariance test | the off-site coupling machinery |
 | 4 | **Off-site `H_ij`** model assembled from Stage 3 | full bond model + bond-flip Hermiticity |
 | 5 | Unified `LinearH2C` model struct, hypers/heuristics, sanity checks, full §12 suite, docs | integration, UX |
