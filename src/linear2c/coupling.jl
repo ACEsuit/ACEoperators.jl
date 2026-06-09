@@ -8,11 +8,18 @@
 # IMPORTANT — this is the *Clebsch–Gordan coupling of two independent orbital
 # indices* (a tensor product), NOT the Gaunt/product coupling of two harmonics
 # at the same point. The latter (`O3.coupling_coeffs` / `O3.cgmatrix`) carries
-# the parity selection `l+l'+λ` even and would wrongly drop the pseudotensor
-# channels. The matrix block X_{lm,l'm'} couples to ALL admissible
-# `λ ∈ |l-l'|:l+l'` (both parities); the odd-parity (`l+l'+λ` odd) channels are
-# the pseudotensor components — present and nonzero for off-diagonal shell pairs
-# (they vanish only on diagonal pairs n=n',l=l' by Hermiticity, §12.6).
+# the selection rule `l+l'+λ` even and would drop the odd-`l+l'+λ` channels. As
+# a pure change of basis on the block, ALL admissible `λ ∈ |l-l'|:l+l'` are
+# present. NOTE on terminology: the LCAO Hamiltonian of a scalar operator is a
+# PROPER O(3) tensor (transforming as D^l ⊗ D^{l'}); the odd-`l+l'+λ` λ-blocks
+# carry inversion sign (-1)^{l+l'}, which is simply the correct behaviour of
+# that component of l⊗l' — they are not "pseudotensors of H". Whether an
+# odd-`l+l'+λ` component is nonzero is a question of selection rules and the
+# feature set that sources it (see §5.2 / the model files): for on-site and
+# single-bond blocks the odd channels vanish identically (Gaunt rule / one bond
+# vector), so they are unused there; they can be nonzero only for environment-
+# dependent off-site blocks with genuine axial/chiral geometry, which the
+# real-CG ACE features cannot form.
 #
 # Construction (verified numerically, see test_coupling.jl):
 #   * Start from the COMPLEX CG block  Cc[μ,m,m'] = ⟨l m; l' m' | λ μ⟩  (all λ,
@@ -20,11 +27,11 @@
 #   * Map to the real basis via the vector law  v_real = Ctran(l) · v_complex
 #     (verified: `D_from_angles(l,·,real) = Ctran(l) D_complex Ctran(l)'`), so a
 #     covariant block converts as  X_r = T_l X_c T_{l'}ᵀ  with  T = Ctran.
-#   * The resulting coupling is purely real on even-parity channels and purely
-#     imaginary on odd-parity channels; since `D_from_angles(·,real)` is real,
-#     real and imaginary parts intertwine separately. We therefore take the real
-#     part on even channels and the imaginary part on odd channels — a single
-#     real, complete, orthonormal change of basis over all λ.
+#   * The resulting coupling is purely real on even-`l+l'+λ` channels and purely
+#     imaginary on odd ones; since `D_from_angles(·,real)` is real, real and
+#     imaginary parts intertwine separately. We take the real part on even
+#     channels and the imaginary part on odd channels — a single real, complete,
+#     orthonormal change of basis over all λ.
 #
 # Conventions: ascending indices, m = -l:l ↦ 1:2l+1, μ = -λ:λ ↦ 1:2λ+1; a block
 # transforms as  X ↦ D^l(Q) X D^{l'}(Q)ᵀ  and a coupled component as v ↦ D^λ v,
@@ -41,12 +48,17 @@ using LinearAlgebra: I
 """
     channel_parity(l, l', λ) -> Symbol
 
-`:proper` if `l+l'+λ` is even (the λ-block component is a proper tensor, sourced
-by proper-tensor ACE features), `:pseudo` if odd (pseudotensor component). Used
-by the on-/off-site models to select matching-parity features per channel (§5.2).
+Classifies a coupled channel by `l+l'+λ`: `:even` channels are sourced by the
+ordinary (geometric, proper-tensor) ACE/bond features; `:odd` channels would
+require axial/chiral features (parity `(-1)^{λ+1}`) that the real-CG ACE
+construction cannot form, and vanish identically for on-site and single-bond
+blocks. The on-/off-site models populate the `:even` channels (§5.2).
+
+(The names refer to the parity of `l+l'+λ`, not to the Hamiltonian itself, which
+is a proper O(3) tensor — see the file header.)
 """
 channel_parity(l::Integer, lp::Integer, λ::Integer) =
-      iseven(l + lp + λ) ? :proper : :pseudo
+      iseven(l + lp + λ) ? :even : :odd
 
 """
     cg_block(l, l', λ) -> Array{Float64,3}
@@ -92,7 +104,7 @@ struct BlockCoupling
    l::Int
    lp::Int
    λs::Vector{Int}                  # all triangle-admissible channels
-   parities::Vector{Symbol}         # :proper / :pseudo per channel
+   parities::Vector{Symbol}         # :even / :odd (parity of l+l'+λ) per channel
    C::Vector{Array{Float64, 3}}     # C[k] = cg_block(l, l', λs[k])
 end
 
