@@ -3,12 +3,13 @@
 #
 # The block coupling X_{lm,l'm'} ↔ X^{λμ} is the Clebsch–Gordan coupling of two
 # independent orbital indices, so ALL triangle-admissible λ appear (both
-# parities). Even-parity (l+l'+λ even) channels are proper-tensor components,
-# odd-parity ones are pseudotensor components — all present and nonzero. The
-# coupling must be (a) a complete orthonormal change of basis (couple/decouple
-# exact inverses both ways), and (b) intertwine the block transform
-# D^l X (D^{l'})ᵀ with the single-irrep transform D^λ v (the property the §12
-# equivariance of H/S rests on).
+# parities of l+l'+λ) — the coupling is a pure, complete change of basis. (The
+# even/odd l+l'+λ distinction matters only when the model SOURCES a channel from
+# geometric features; the coupling itself carries all λ.) The coupling must be
+# (a) a complete orthonormal change of basis (couple/decouple exact inverses
+# both ways), and (b) intertwine the block transform D^l X (D^{l'})ᵀ with the
+# single-irrep transform D^λ v (the property the §12 equivariance of H/S rests
+# on).
 #
 # Part 2 (three-way coupling equivariance) is added in Stage 3.
 #
@@ -101,14 +102,14 @@ end
 @testset "orbital-swap symmetry carries the (-1)^{l+l'+λ} sign" begin
    # ⟨l m; l' m' | λ μ⟩ = (-1)^{l+l'-λ} ⟨l' m'; l m | λ μ⟩ : transposing the
    # orbital block maps a coupled component to ± itself with σ = (-1)^{l+l'+λ}.
-   # Even (proper) channels are symmetric (σ=+1), odd (pseudo) antisymmetric
-   # (σ=-1) — the seed of the §12.6 / Hermiticity selection rules.
+   # Even-`l+l'+λ` channels are symmetric (σ=+1), odd ones antisymmetric (σ=-1)
+   # — the seed of the §12.6 / Hermiticity selection rules.
    for l in ls, lp in ls
       bc  = BlockCoupling(l, lp)
       bcT = BlockCoupling(lp, l)
       for (k, λ) in enumerate(bc.λs)
          σ = (-1)^(l + lp + λ)
-         @test (σ == 1) == (bc.parities[k] == :proper)
+         @test (σ == 1) == (bc.parities[k] == :even)
          @test bc.C[k] ≈ σ .* permutedims(bcT.C[k], (1, 3, 2))
       end
    end
