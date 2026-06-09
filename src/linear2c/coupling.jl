@@ -41,9 +41,8 @@
 # into EquivariantTensors once stable (see agents/plan_lin2c.md §1.5).
 #
 
-import EquivariantTensors as ET
 using EquivariantTensors: O3
-using LinearAlgebra: I
+using LinearAlgebra: I, mul!
 
 """
     channel_parity(l, l', λ) -> Symbol
@@ -71,6 +70,9 @@ element type `T` selects the working precision of the stored coupling.
 Returns a `(2λ+1, 2l+1, 2l'+1)` array; nonzero for every triangle-admissible
 `λ ∈ |l-l'|:l+l'` (both parities). The slices are orthonormal:
 `Σ_{m,m'} C[μ,m,m'] C[ν,m,m'] = δ_{μν}`.
+
+The construction is carried out internally in `ComplexF64`; `T` only selects
+the storage precision (a `T` wider than `Float64` gains no accuracy).
 """
 function cg_block(::Type{T}, l::Integer, lp::Integer, λ::Integer) where {T}
    C = zeros(T, 2λ + 1, 2l + 1, 2lp + 1)
@@ -106,12 +108,12 @@ block `cg_block(l, l', λ)` for every triangle-admissible channel
 struct BlockCoupling{T}
    l::Int
    lp::Int
-   λs::Vector{Int}                  # all triangle-admissible channels
+   λs::UnitRange{Int}               # all triangle-admissible channels
    C::Vector{Array{T, 3}}           # C[k] = cg_block(T, l, l', λs[k])
 end
 
 function BlockCoupling(::Type{T}, l::Integer, lp::Integer) where {T}
-   λs = collect(abs(l - lp):(l + lp))
+   λs = abs(l - lp):(l + lp)
    C = [ cg_block(T, l, lp, λ) for λ in λs ]
    return BlockCoupling{T}(Int(l), Int(lp), λs, C)
 end
@@ -120,66 +122,74 @@ BlockCoupling(l::Integer, lp::Integer) = BlockCoupling(Float64, l, lp)
 
 Base.length(bc::BlockCoupling) = length(bc.λs)
 
+# channel index of λ in bc.λs (contiguous range ⇒ O(1) arithmetic)
+function _λindex(bc::BlockCoupling, λ::Integer)
+   k = Int(λ) - first(bc.λs) + 1
+   (1 <= k <= length(bc.λs)) || error(
+         "λ = $λ is not admissible for (l,l') = ($(bc.l),$(bc.lp))")
+   return k
+end
+
+# the CG block of channel λs[k], reshaped to a (2λ+1) × (2l+1)(2l'+1)
+# matrix; `reshape` of an `Array` shares the underlying data (no copy)
+_cgmat(bc::BlockCoupling, k::Integer) =
+      reshape(bc.C[k], size(bc.C[k], 1), :)
+
 """
-    couple(bc::BlockCoupling, X) -> Vector{Vector{T}}
+    couple(bc::BlockCoupling, X) -> Vector{<:AbstractVector}
 
 Decompose a `(2l+1)×(2l'+1)` matrix block `X` into its coupled components,
 `Xλ[k][μ+λ+1] = Σ_{m,m'} C[μ,m,m'] X[m,m']` for `λ = bc.λs[k]`. Exact inverse of
 [`decouple`](@ref) (the coupling is a complete orthonormal change of basis).
+The element type follows `promote_type(eltype(bc.C), eltype(X))`.
 """
-function couple(bc::BlockCoupling{T}, X::AbstractMatrix) where {T}
+function couple(bc::BlockCoupling, X::AbstractMatrix)
    @assert size(X) == (2 * bc.l + 1, 2 * bc.lp + 1)
-   Xλ = Vector{Vector{T}}(undef, length(bc.λs))
-   for (k, λ) in enumerate(bc.λs)
-      C = bc.C[k]
-      v = zeros(T, 2λ + 1)
-      for μ = 1:(2λ + 1), mi = 1:size(X, 1), mpi = 1:size(X, 2)
-         v[μ] += C[μ, mi, mpi] * X[mi, mpi]
-      end
-      Xλ[k] = v
-   end
-   return Xλ
+   x = vec(X)
+   return [ _cgmat(bc, k) * x for k in eachindex(bc.λs) ]
 end
 
 """
-    decouple(bc::BlockCoupling, Xλ) -> Matrix{T}
+    decouple(bc::BlockCoupling, Xλ) -> Matrix
 
 Reassemble the `(2l+1)×(2l'+1)` matrix block from its coupled components,
 `X[m,m'] = Σ_λ Σ_μ C[μ,m,m'] Xλ[λ][μ]`. Exact inverse of [`couple`](@ref).
 Equal to `Σ_λ transform_λ(bc, λ, Xλ[λ])`.
 """
-function decouple(bc::BlockCoupling{T}, Xλ::AbstractVector) where {T}
+function decouple(bc::BlockCoupling, Xλ::AbstractVector)
    @assert length(Xλ) == length(bc.λs)
-   X = zeros(T, 2 * bc.l + 1, 2 * bc.lp + 1)
-   for (k, λ) in enumerate(bc.λs)
-      _accumulate_block!(X, bc.C[k], Xλ[k])
-   end
-   return X
+   return sum( transform_λ(bc, λ, Xλ[k]) for (k, λ) in enumerate(bc.λs) )
 end
 
 """
-    transform_λ(bc::BlockCoupling, λ, vλ) -> Matrix{T}
+    transform_λ(bc::BlockCoupling, λ, vλ) -> Matrix
 
 The §4 `transform_λ[...]_{mm'}` operation for a single channel `λ`: given the
 λ-equivariant vector `vλ` (length `2λ+1`, e.g. `Σ_q w_q B^{λμ}_q`), return its
 contribution to the `(l,m;l',m')` block,
 `transform_λ(vλ)[m,m'] = Σ_μ C[μ,m,m'] vλ[μ]`. The full block is the sum over
-all channels, i.e. `decouple(bc, [v_{λ}...])`.
+all channels, i.e. `decouple(bc, [v_{λ}...])`. See [`transform_λ!`](@ref) for
+an in-place accumulating variant.
 """
-function transform_λ(bc::BlockCoupling{T}, λ::Integer, vλ::AbstractVector) where {T}
-   k = findfirst(==(Int(λ)), bc.λs)
-   k === nothing && error(
-         "λ = $λ is not admissible for (l,l') = ($(bc.l),$(bc.lp))")
+function transform_λ(bc::BlockCoupling, λ::Integer, vλ::AbstractVector)
+   k = _λindex(bc, λ)
    @assert length(vλ) == 2λ + 1
-   X = zeros(T, 2 * bc.l + 1, 2 * bc.lp + 1)
-   _accumulate_block!(X, bc.C[k], vλ)
-   return X
+   x = transpose(_cgmat(bc, k)) * vλ
+   return reshape(x, 2 * bc.l + 1, 2 * bc.lp + 1)
 end
 
-# X[m,m'] += Σ_μ C[μ,m,m'] v[μ]
-function _accumulate_block!(X, C, v)
-   for μ = 1:length(v), mi = 1:size(X, 1), mpi = 1:size(X, 2)
-      X[mi, mpi] += C[μ, mi, mpi] * v[μ]
-   end
+"""
+    transform_λ!(X, bc::BlockCoupling, λ, vλ) -> X
+
+In-place variant of [`transform_λ`](@ref): accumulates the channel-`λ`
+contribution into the `(2l+1)×(2l'+1)` block, `X[m,m'] += Σ_μ C[μ,m,m'] vλ[μ]`,
+without allocating. Intended for the matrix assembly loops.
+"""
+function transform_λ!(X::AbstractMatrix, bc::BlockCoupling, λ::Integer,
+                      vλ::AbstractVector)
+   k = _λindex(bc, λ)
+   @assert size(X) == (2 * bc.l + 1, 2 * bc.lp + 1)
+   @assert length(vλ) == 2λ + 1
+   mul!(vec(X), transpose(_cgmat(bc, k)), vλ, true, true)
    return X
 end
