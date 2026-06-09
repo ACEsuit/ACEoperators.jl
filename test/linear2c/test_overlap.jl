@@ -9,45 +9,15 @@ using Test, LinearAlgebra, StaticArrays, Random
 using EquivariantTensors: O3
 import ACEoperators as A
 
+include("symmetry_utils.jl")
+
 ##
 
 @info("Stage 1: two-center overlap model S")
 
 rng = MersenneTwister(2024)
 
-# --- helpers ---------------------------------------------------------------
-
-# block-Wigner matrix 𝓓(Q) = blockdiag over (atom, shell) of D^l(Q)
-function blockwigner(model, Zs, θ)
-   ob = model.orbitals
-   layout = A.OrbitalLayout(ob, Zs)
-   D = zeros(layout.ntot, layout.ntot)
-   for i = 1:length(Zs)
-      shs = A.species_shells(ob, Zs[i])
-      for a = 1:length(shs)
-         r = A.shell_range(layout, i, a)
-         D[r, r] = O3.D_from_angles(shs[a].l, θ, real)
-      end
-   end
-   return D
-end
-
-# parity matrix for inversion: blockdiag over (atom, shell) of (-1)^l I
-function parity_matrix(model, Zs)
-   ob = model.orbitals
-   layout = A.OrbitalLayout(ob, Zs)
-   P = zeros(layout.ntot, layout.ntot)
-   for i = 1:length(Zs)
-      shs = A.species_shells(ob, Zs[i])
-      for a = 1:length(shs)
-         r = A.shell_range(layout, i, a)
-         P[r, r] = (-1)^(shs[a].l) * I(length(r))
-      end
-   end
-   return P
-end
-
-assemble(model, Zs, Rs, W) = A.assemble_S(model, Zs, Rs |> R -> A.bondlist(R, model.rcut), W)
+assemble(model, Zs, Rs, W) = A.assemble_S(model, Zs, A.bondlist(Rs, model.rcut), W)
 
 # a small mixed cluster
 ob = A.OrbitalBasis(:Si => [(n=3, l=0), (n=3, l=1), (n=3, l=2)],
@@ -83,7 +53,7 @@ end
       Q = O3.Q_from_angles(θ)
       Rs_rot = [SVector{3}(Q * r) for r in Rs0]
       S_rot = assemble(model, Zs, Rs_rot, W)
-      𝓓 = blockwigner(model, Zs, θ)
+      𝓓 = blockwigner(model.orbitals, Zs, θ)
       @test S_rot ≈ 𝓓 * S * 𝓓'
    end
 end
@@ -92,7 +62,7 @@ end
    S = assemble(model, Zs, Rs0, W)
    Rs_inv = [-r for r in Rs0]
    S_inv = assemble(model, Zs, Rs_inv, W)
-   P = parity_matrix(model, Zs)
+   P = parity_matrix(model.orbitals, Zs)
    @test S_inv ≈ P * S * P'
    # the parity action is nontrivial (some l are odd) — guard against a trivial pass
    @test !(P ≈ I(size(P, 1)))
@@ -110,14 +80,7 @@ end
    Z1 = fill(14, 4)
    S = assemble(m1, Z1, Rs, W1)
    π = [3, 1, 4, 2]
-   norb = A.species_norb(ob1, 14)
-   # orbital permutation matrix induced by π
-   Perm = zeros(Int, length(π) * norb, length(π) * norb)
-   for k = 1:length(π)
-      dst = (k - 1) * norb
-      src = (π[k] - 1) * norb
-      Perm[dst .+ (1:norb), src .+ (1:norb)] = I(norb)
-   end
+   Perm = atom_perm_matrix(π, A.species_norb(ob1, 14))
    S_perm = assemble(m1, Z1[π], Rs[π], W1)
    @test S_perm ≈ Perm * S * Perm'
 end
