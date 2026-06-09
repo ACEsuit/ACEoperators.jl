@@ -16,8 +16,8 @@
 
 using Test, LinearAlgebra
 using EquivariantTensors: O3
-using ACEoperators: BlockCoupling, couple, decouple, transform_λ, cg_block,
-                    channel_parity
+using ACEoperators: BlockCoupling, couple, decouple, transform_λ, transform_λ!,
+                    cg_block, channel_parity
 
 ##
 
@@ -112,6 +112,28 @@ end
    end
 end
 
+@testset "improper rotations: odd channels are pseudo-λ" begin
+   # Under an improper Q = -R (det Q = -1, R ∈ SO(3)) the block picks up
+   # (-1)^{l+l'}: X ↦ (-1)^{l+l'} D^l(R) X D^{l'}(R)ᵀ, while a degree-λ irrep
+   # vector picks up (-1)^λ. Even-(l+l'+λ) channels therefore transform as
+   # true λ-irreps under O(3); odd channels carry the extra sign (-1)^{λ+1}
+   # (pseudo-λ) — the sign structure behind the §12.2 / §12.6 selection rules.
+   for l in ls, lp in ls
+      bc  = BlockCoupling(l, lp)
+      Dl  = O3.D_from_angles(l,  θ, real)
+      Dlp = O3.D_from_angles(lp, θ, real)
+      for (k, λ) in enumerate(bc.λs)
+         Dλ = O3.D_from_angles(λ, θ, real)
+         σ  = (-1)^(l + lp + λ)        # +1 even channel, -1 odd channel
+         v  = randn(2λ + 1)
+         X  = transform_λ(bc, λ, v)
+         # block image under Q = -R  vs  coupled image σ ⋅ (-1)^λ D^λ(R) v
+         Xinv = (-1)^(l + lp) * Dl * X * transpose(Dlp)
+         @test transform_λ(bc, λ, σ * (-1)^λ * (Dλ * v)) ≈ Xinv
+      end
+   end
+end
+
 @testset "orbital-swap symmetry carries the (-1)^{l+l'+λ} sign" begin
    # ⟨l m; l' m' | λ μ⟩ = (-1)^{l+l'-λ} ⟨l' m'; l m | λ μ⟩ : transposing the
    # orbital block maps a coupled component to ± itself with σ = (-1)^{l+l'+λ}.
@@ -126,4 +148,16 @@ end
          @test bc.C[k] ≈ σ .* permutedims(bcT.C[k], (1, 3, 2))
       end
    end
+end
+
+@testset "transform_λ! accumulates in place; inadmissible λ errors" begin
+   bc = BlockCoupling(1, 2)         # λs = 1:3
+   X  = randn(3, 5); X0 = copy(X)
+   v  = randn(5)                    # channel λ = 2
+   @test transform_λ!(X, bc, 2, v) === X
+   @test X ≈ X0 + transform_λ(bc, 2, v)
+   # inadmissible channels are rejected on both sides of the triangle range
+   @test_throws ErrorException transform_λ(bc, 0, randn(1))
+   @test_throws ErrorException transform_λ(bc, 4, randn(9))
+   @test_throws ErrorException transform_λ!(X, bc, 0, randn(1))
 end
