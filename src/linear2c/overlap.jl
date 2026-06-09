@@ -76,8 +76,8 @@ function OverlapModel(orbitals::OrbitalBasis;
          la = shi[a].l; lb = shj[b].l
          haskey(couplings, (la, lb)) || (couplings[(la, lb)] = BlockCoupling(la, lb))
          bc = couplings[(la, lb)]
-         for (k, Λ) in enumerate(bc.λs)
-            bc.parities[k] == :even || continue       # single bond ⇒ even l+l'+Λ only
+         for Λ in bc.λs
+            channel_parity(la, lb, Λ) == :even || continue   # single bond ⇒ even l+l'+Λ
             cols = [ q for q = 1:length(rspec) if rspec[q].l == Λ ]
             isempty(cols) && continue
             push!(entries, OffsiteEntry(iz, jz, a, b, la, lb, Λ, cols,
