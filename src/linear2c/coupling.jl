@@ -61,18 +61,19 @@ channel_parity(l::Integer, lp::Integer, λ::Integer) =
       iseven(l + lp + λ) ? :even : :odd
 
 """
-    cg_block(l, l', λ) -> Array{Float64,3}
+    cg_block([T=Float64], l, l', λ) -> Array{T,3}
 
 Dense real Clebsch–Gordan block coupling `C[μ+λ+1, m+l+1, m'+l'+1]` coupling the
 orbital pair `(l, l')` to the output irrep `λ`, in the ascending-index real
-convention consistent with `O3.D_from_angles(·, real)` (see file header).
+convention consistent with `O3.D_from_angles(·, real)` (see file header). The
+element type `T` selects the working precision of the stored coupling.
 
 Returns a `(2λ+1, 2l+1, 2l'+1)` array; nonzero for every triangle-admissible
 `λ ∈ |l-l'|:l+l'` (both parities). The slices are orthonormal:
 `Σ_{m,m'} C[μ,m,m'] C[ν,m,m'] = δ_{μν}`.
 """
-function cg_block(l::Integer, lp::Integer, λ::Integer)
-   C = zeros(Float64, 2λ + 1, 2l + 1, 2lp + 1)
+function cg_block(::Type{T}, l::Integer, lp::Integer, λ::Integer) where {T}
+   C = zeros(T, 2λ + 1, 2l + 1, 2lp + 1)
    (abs(l - lp) <= λ <= l + lp) || return C
    Tl = O3.Ctran(l); Tlp = O3.Ctran(lp); Tλ = O3.Ctran(λ)
    even = iseven(l + lp + λ)
@@ -86,11 +87,13 @@ function cg_block(l::Integer, lp::Integer, λ::Integer)
          s += conj(Tλ[ν + λ + 1, μ + λ + 1]) *
               Tl[a + l + 1, m + l + 1] * Tlp[b + lp + 1, mp + lp + 1] * cc
       end
-      # even-parity channel is purely real, odd-parity purely imaginary
-      C[ν + λ + 1, a + l + 1, b + lp + 1] = even ? real(s) : imag(s)
+      # even-(l+l'+λ) channel is purely real, odd-(l+l'+λ) purely imaginary
+      C[ν + λ + 1, a + l + 1, b + lp + 1] = even ? T(real(s)) : T(imag(s))
    end
    return C
 end
+
+cg_block(l::Integer, lp::Integer, λ::Integer) = cg_block(Float64, l, lp, λ)
 
 """
     BlockCoupling(l, l')
@@ -100,36 +103,36 @@ block `cg_block(l, l', λ)` for every triangle-admissible channel
 `λ ∈ |l-l'|:l+l'`, and provides `couple` / `decouple` between an
 `(2l+1)×(2l'+1)` matrix block and its complete set of coupled `λ`-components.
 """
-struct BlockCoupling
+struct BlockCoupling{T}
    l::Int
    lp::Int
    λs::Vector{Int}                  # all triangle-admissible channels
-   parities::Vector{Symbol}         # :even / :odd (parity of l+l'+λ) per channel
-   C::Vector{Array{Float64, 3}}     # C[k] = cg_block(l, l', λs[k])
+   C::Vector{Array{T, 3}}           # C[k] = cg_block(T, l, l', λs[k])
 end
 
-function BlockCoupling(l::Integer, lp::Integer)
+function BlockCoupling(::Type{T}, l::Integer, lp::Integer) where {T}
    λs = collect(abs(l - lp):(l + lp))
-   parities = [ channel_parity(l, lp, λ) for λ in λs ]
-   C = [ cg_block(l, lp, λ) for λ in λs ]
-   return BlockCoupling(Int(l), Int(lp), λs, parities, C)
+   C = [ cg_block(T, l, lp, λ) for λ in λs ]
+   return BlockCoupling{T}(Int(l), Int(lp), λs, C)
 end
+
+BlockCoupling(l::Integer, lp::Integer) = BlockCoupling(Float64, l, lp)
 
 Base.length(bc::BlockCoupling) = length(bc.λs)
 
 """
-    couple(bc::BlockCoupling, X) -> Vector{Vector{Float64}}
+    couple(bc::BlockCoupling, X) -> Vector{Vector{T}}
 
 Decompose a `(2l+1)×(2l'+1)` matrix block `X` into its coupled components,
 `Xλ[k][μ+λ+1] = Σ_{m,m'} C[μ,m,m'] X[m,m']` for `λ = bc.λs[k]`. Exact inverse of
 [`decouple`](@ref) (the coupling is a complete orthonormal change of basis).
 """
-function couple(bc::BlockCoupling, X::AbstractMatrix)
+function couple(bc::BlockCoupling{T}, X::AbstractMatrix) where {T}
    @assert size(X) == (2 * bc.l + 1, 2 * bc.lp + 1)
-   Xλ = Vector{Vector{Float64}}(undef, length(bc.λs))
+   Xλ = Vector{Vector{T}}(undef, length(bc.λs))
    for (k, λ) in enumerate(bc.λs)
       C = bc.C[k]
-      v = zeros(Float64, 2λ + 1)
+      v = zeros(T, 2λ + 1)
       for μ = 1:(2λ + 1), mi = 1:size(X, 1), mpi = 1:size(X, 2)
          v[μ] += C[μ, mi, mpi] * X[mi, mpi]
       end
@@ -139,15 +142,15 @@ function couple(bc::BlockCoupling, X::AbstractMatrix)
 end
 
 """
-    decouple(bc::BlockCoupling, Xλ) -> Matrix{Float64}
+    decouple(bc::BlockCoupling, Xλ) -> Matrix{T}
 
 Reassemble the `(2l+1)×(2l'+1)` matrix block from its coupled components,
 `X[m,m'] = Σ_λ Σ_μ C[μ,m,m'] Xλ[λ][μ]`. Exact inverse of [`couple`](@ref).
 Equal to `Σ_λ transform_λ(bc, λ, Xλ[λ])`.
 """
-function decouple(bc::BlockCoupling, Xλ::AbstractVector)
+function decouple(bc::BlockCoupling{T}, Xλ::AbstractVector) where {T}
    @assert length(Xλ) == length(bc.λs)
-   X = zeros(Float64, 2 * bc.l + 1, 2 * bc.lp + 1)
+   X = zeros(T, 2 * bc.l + 1, 2 * bc.lp + 1)
    for (k, λ) in enumerate(bc.λs)
       _accumulate_block!(X, bc.C[k], Xλ[k])
    end
@@ -155,7 +158,7 @@ function decouple(bc::BlockCoupling, Xλ::AbstractVector)
 end
 
 """
-    transform_λ(bc::BlockCoupling, λ, vλ) -> Matrix{Float64}
+    transform_λ(bc::BlockCoupling, λ, vλ) -> Matrix{T}
 
 The §4 `transform_λ[...]_{mm'}` operation for a single channel `λ`: given the
 λ-equivariant vector `vλ` (length `2λ+1`, e.g. `Σ_q w_q B^{λμ}_q`), return its
@@ -163,12 +166,12 @@ contribution to the `(l,m;l',m')` block,
 `transform_λ(vλ)[m,m'] = Σ_μ C[μ,m,m'] vλ[μ]`. The full block is the sum over
 all channels, i.e. `decouple(bc, [v_{λ}...])`.
 """
-function transform_λ(bc::BlockCoupling, λ::Integer, vλ::AbstractVector)
+function transform_λ(bc::BlockCoupling{T}, λ::Integer, vλ::AbstractVector) where {T}
    k = findfirst(==(Int(λ)), bc.λs)
    k === nothing && error(
          "λ = $λ is not admissible for (l,l') = ($(bc.l),$(bc.lp))")
    @assert length(vλ) == 2λ + 1
-   X = zeros(Float64, 2 * bc.l + 1, 2 * bc.lp + 1)
+   X = zeros(T, 2 * bc.l + 1, 2 * bc.lp + 1)
    _accumulate_block!(X, bc.C[k], vλ)
    return X
 end
