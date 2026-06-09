@@ -4,12 +4,17 @@ authors = ["Christoph Ortner <christophortner0@gmail.com>"]
 version = "1.0.0-DEV"
 
 [deps]
+ACEpotentials = "3b96b61c-0fcc-4693-95ed-1ef9f35fcc53"
 EquivariantTensors = "5e107534-7145-4f8f-b06f-47a52840c895"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Polynomials4ML = "03c4bcba-a943-47e9-bfa1-b1661fc2974f"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+ACEpotentials = "0.10"
 EquivariantTensors = "0.4"
+Polynomials4ML = "0.5"
 StaticArrays = "1"
 julia = "1.11"
 
