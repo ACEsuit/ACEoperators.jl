@@ -66,8 +66,8 @@ function OnsiteModel(orbitals::OrbitalBasis;
          la = shi[a].l; lb = shi[b].l
          haskey(couplings, (la, lb)) || (couplings[(la, lb)] = BlockCoupling(la, lb))
          bc = couplings[(la, lb)]
-         for (k, λ) in enumerate(bc.λs)
-            bc.parities[k] == :even || continue       # even l+l'+λ (Gaunt) on-site
+         for λ in bc.λs
+            channel_parity(la, lb, λ) == :even || continue   # even l+l'+λ (Gaunt)
             nf = nfeatures(env, λ)
             nf == 0 && continue
             push!(entries, OnsiteEntry(iz, a, b, la, lb, λ, nf, (w + 1):(w + nf)))
