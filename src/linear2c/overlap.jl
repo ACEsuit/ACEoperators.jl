@@ -45,7 +45,7 @@ struct OverlapModel{TR, TY, TRP, TRS}
    bondradial_ps::TRP              # fixed radial weights
    bondradial_st::TRS
    ybasis::TY                      # real_sphericalharmonics(maxL)
-   couplings::Dict{Tuple{Int,Int}, BlockCoupling}
+   couplings::Dict{Tuple{Int,Int}, BlockCoupling{Float64}}
    entries::Vector{OffsiteEntry}
    group::Dict{Tuple{Int,Int}, Vector{Int}}   # (iz,jz) -> entry indices
    nparam::Int
@@ -67,7 +67,7 @@ function OverlapModel(orbitals::OrbitalBasis;
    rspec = bondradial.spec                      # Vector of (n=,l=)
    rcut = maximum(c.rcut for c in bondradial.rin0cuts)
 
-   couplings = Dict{Tuple{Int,Int}, BlockCoupling}()
+   couplings = Dict{Tuple{Int,Int}, BlockCoupling{Float64}}()
    entries = OffsiteEntry[]
    w = 0
    for iz = 1:length(orbitals._i2z), jz = 1:length(orbitals._i2z)
