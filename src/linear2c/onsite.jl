@@ -2,17 +2,19 @@
 # onsite.jl — on-site Hamiltonian blocks H_ii (§5, Stage 2)
 #
 # H_ii depends on the local atomic environment of site i. For each shell pair
-# (n l, n' l') of the center species and each matching-parity coupled angular
-# momentum λ (l+l'+λ even, §5.2), the λ-block of H_ii is a linear combination of
-# the equivariant environment features B_i^{λ} (from EnvBasis), recoupled into
-# the (m,m') block via transform_λ (§4). The on-site contribution is
-# block-diagonal in the atom index; Hermiticity is enforced post-hoc by
-# H ← ½(H + Hᵀ) (§7.3).
+# (n l, n' l') of the center species and each even-`l+l'+λ` coupled angular
+# momentum λ (§5.2), the λ-block of H_ii is a linear combination of the
+# equivariant environment features B_i^{λ} (from EnvBasis), recoupled into the
+# (m,m') block via transform_λ (§4). The on-site contribution is block-diagonal
+# in the atom index; Hermiticity is enforced post-hoc by H ← ½(H + Hᵀ) (§7.3).
 #
-# Like the overlap model, only proper-parity channels are populated: EnvBasis
-# yields proper-tensor features, so the pseudotensor (odd l+l'+λ) channels are
-# not representable here and are left at zero — which also gives the §12.6
-# vanishing of odd-λ diagonal-shell components.
+# Populating only even-`l+l'+λ` channels is COMPLETE for the on-site block, not
+# an approximation: both orbitals share the center i, so the matrix element
+# integrates Y_l(r̂) Y_{l'}(r̂) against the (scalar) operator, and the Gaunt
+# selection rule ∫ Y_l Y_{l'} Y_λ ≠ 0 forces l+l'+λ even — the odd-`l+l'+λ`
+# components of H_ii vanish identically (for all shell pairs, not only diagonal
+# ones; this is the §12.6 statement). EnvBasis supplies exactly these even
+# channels via its proper-tensor features.
 #
 
 using LinearAlgebra: norm, I
@@ -65,7 +67,7 @@ function OnsiteModel(orbitals::OrbitalBasis;
          haskey(couplings, (la, lb)) || (couplings[(la, lb)] = BlockCoupling(la, lb))
          bc = couplings[(la, lb)]
          for (k, λ) in enumerate(bc.λs)
-            bc.parities[k] == :proper || continue     # proper-tensor features only
+            bc.parities[k] == :even || continue       # even l+l'+λ (Gaunt) on-site
             nf = nfeatures(env, λ)
             nf == 0 && continue
             push!(entries, OnsiteEntry(iz, a, b, la, lb, λ, nf, (w + 1):(w + nf)))

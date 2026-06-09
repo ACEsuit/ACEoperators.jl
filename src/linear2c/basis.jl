@@ -7,11 +7,11 @@
 # top of an ACEpotentials radial basis and real spherical harmonics. The same
 # 𝓑_i is shared by the on-site model (Stage 2) and the off-site model (Stage 4).
 #
-# Only PROPER-tensor features are produced (the real-CG construction in
-# EquivariantTensors couples to proper tensors, parity (-1)^L). Pseudotensor
-# (odd-parity) features are not available from this construction; consequently
-# the on-/off-site models populate only the matching-parity (l+l'+λ even)
-# channels — see coupling.jl and §5.2.
+# The real-CG construction in EquivariantTensors couples to proper tensors
+# (parity (-1)^L); axial/chiral features (parity (-1)^{L+1}) are not produced.
+# The models therefore populate the even-`l+l'+λ` channels, which is complete
+# for on-site and single-bond blocks (their odd channels vanish identically by
+# the Gaunt / single-bond selection rule) — see coupling.jl, onsite.jl and §5.2.
 #
 
 import ACEpotentials.Models as _M

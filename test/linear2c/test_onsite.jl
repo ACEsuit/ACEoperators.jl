@@ -76,9 +76,10 @@ end
 end
 
 @testset "odd-λ vanishing on diagonal shell pairs (§12.6)" begin
-   # On a diagonal shell pair (l, l) the matching-parity channels are λ even
-   # (l+l'+λ = 2l+λ even); the odd-λ (pseudotensor) coupled components are not
-   # representable and must be identically zero in the assembled block.
+   # On a diagonal shell pair (l, l) the even-`l+l'+λ` channels are λ even
+   # (2l+λ even). The odd-λ coupled components of an on-site block vanish
+   # identically (Gaunt rule: both orbitals share the center), so the assembled
+   # block must have zero projection onto them.
    H = A.assemble_Honsite(model, Zs, Rs0, W)
    layout = A.OrbitalLayout(ob, Zs)
    for i = 1:length(Zs)
@@ -90,7 +91,7 @@ end
          bc = A.BlockCoupling(l, l)
          Xλ = A.couple(bc, blk)
          for (k, λ) in enumerate(bc.λs)
-            if isodd(2l + λ)               # pseudotensor channel
+            if isodd(2l + λ)               # odd-l+l'+λ channel (must vanish)
                @test norm(Xλ[k]) < 1e-10
             end
          end

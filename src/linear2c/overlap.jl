@@ -6,10 +6,11 @@
 # vector r_ji. For each ordered shell pair (n l, n' l') and each admissible
 # coupled angular momentum Λ, the Λ-block of S_ij is a linear combination of
 # bond harmonics φ^b_{n_q Λ}(r_ji) = R^b_{n_q Λ}(r) Y_{Λ·}(r̂), recoupled into the
-# (m,m') block via transform_Λ (§4). Only PROPER-parity channels (l+l'+Λ even)
-# appear: a single bond vector yields proper tensors only, which is exactly what
-# a geometric two-center quantity can carry. Hermiticity is enforced post-hoc by
-# S ← ½(S + Sᵀ) (§7.3).
+# (m,m') block via transform_Λ (§4). Only even-`l+l'+Λ` channels appear, and this
+# is COMPLETE for a two-center quantity: a single bond vector supplies only those
+# channels, and the count matches the Slater–Koster integrals (e.g. p–p gives
+# Λ=0,2 = ppσ,ppπ; the odd Λ=1 axial term is correctly absent). Hermiticity is
+# enforced post-hoc by S ← ½(S + Sᵀ) (§7.3).
 #
 
 import ACEpotentials.Models as _M
@@ -76,7 +77,7 @@ function OverlapModel(orbitals::OrbitalBasis;
          haskey(couplings, (la, lb)) || (couplings[(la, lb)] = BlockCoupling(la, lb))
          bc = couplings[(la, lb)]
          for (k, Λ) in enumerate(bc.λs)
-            bc.parities[k] == :proper || continue     # S carries proper tensors only
+            bc.parities[k] == :even || continue       # single bond ⇒ even l+l'+Λ only
             cols = [ q for q = 1:length(rspec) if rspec[q].l == Λ ]
             isempty(cols) && continue
             push!(entries, OffsiteEntry(iz, jz, a, b, la, lb, Λ, cols,
