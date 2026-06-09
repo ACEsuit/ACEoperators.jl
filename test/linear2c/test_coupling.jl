@@ -32,14 +32,27 @@ ls = 0:2     # s, p, d orbitals
       @test bc.λs == collect(abs(l - lp):(l + lp))      # full triangle, no parity drop
       for (k, λ) in enumerate(bc.λs)
          @test size(bc.C[k]) == (2λ + 1, 2l + 1, 2lp + 1)
-         @test bc.parities[k] == channel_parity(l, lp, λ)
+         @test channel_parity(l, lp, λ) == (iseven(l + lp + λ) ? :even : :odd)
          # every admissible channel carries a genuinely nonzero coupling,
-         # including the odd-parity (pseudotensor) ones
+         # including the odd-(l+l'+λ) ones
          @test norm(bc.C[k]) > 1e-8
       end
       # out-of-range λ couples to zero
       @test all(iszero, cg_block(l, lp, l + lp + 1))
    end
+end
+
+@testset "parametric element type" begin
+   bc64 = BlockCoupling(1, 2)                 # default Float64
+   @test bc64 isa BlockCoupling{Float64}
+   bc32 = BlockCoupling(Float32, 1, 2)
+   @test bc32 isa BlockCoupling{Float32}
+   @test all(C -> eltype(C) === Float32, bc32.C)
+   @test cg_block(Float32, 1, 1, 2) ≈ Float32.(cg_block(1, 1, 2))
+   # transform_λ / decouple follow the coupling's precision
+   v = randn(Float32, 5)
+   @test eltype(transform_λ(bc32, 2, v)) === Float32
+   @test eltype(decouple(bc32, [randn(Float32, 2λ + 1) for λ in bc32.λs])) === Float32
 end
 
 @testset "complete orthonormal change of basis" begin
@@ -109,7 +122,7 @@ end
       bcT = BlockCoupling(lp, l)
       for (k, λ) in enumerate(bc.λs)
          σ = (-1)^(l + lp + λ)
-         @test (σ == 1) == (bc.parities[k] == :even)
+         @test (σ == 1) == (channel_parity(l, lp, λ) == :even)
          @test bc.C[k] ≈ σ .* permutedims(bcT.C[k], (1, 3, 2))
       end
    end
