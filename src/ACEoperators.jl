@@ -1,5 +1,9 @@
 module ACEoperators
 
-# Write your package code here.
+# ---------------------------------------------------------------------------
+# Linear 2-center Hamiltonian model (see agents/plan_lin2c.md, docs/twocenter.md)
+# ---------------------------------------------------------------------------
+
+include("linear2c/coupling.jl")
 
 end
