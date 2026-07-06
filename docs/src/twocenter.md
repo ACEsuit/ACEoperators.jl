@@ -52,7 +52,14 @@ constraint that the model must respect, and it is most conveniently handled by
 recoupling the $(l,m;l',m')$ indices into irreducible blocks $(\lambda, \mu)$
 via Clebsch--Gordan (CG) coefficients (§4).
 
-We split the construction into two essentially independent pieces:
+We split the construction into two **separate, independent models** — one for
+$S$ and one for $H$, each with its own struct, hyperparameters, parameters,
+and evaluation path. (An earlier draft envisaged a single model producing the
+pair $(H, S)$; this was dropped: the initial focus is *experimentation*, where
+the functional forms of $S$ and $H$ will be varied independently and may be
+entirely unrelated, and $S$ is typically much cheaper to build and fit than
+$H$, so coupling their evaluation would force the expensive machinery onto
+the cheap target.)
 
 * **Overlap $S$.** Because $S$ is a strictly two-center, geometry-only
   quantity (it depends only on the relative position $\mathbf r_{ji} =
@@ -74,7 +81,7 @@ We split the construction into two essentially independent pieces:
       equivariant function of the environments of *both* sites $i,j$ **and**
       of the bond $\mathbf r_{ji}$ — effectively a two-center ACE expansion in the sense of Nigam *et al.* (§7).
 
-Both pieces reuse the same fundamental building blocks: a one-particle basis
+Both models reuse the same fundamental *building blocks*: a one-particle basis
 $\phi_{nlm} = R_{nl} Y_{lm}$, atomic-density features $A_{i,nlm}$ obtained by
 pooling $\phi_{nlm}$ over neighbours, equivariant ACE bases $B_{i}^{(\nu)}$
 built from tensor products of the $A_{i, nlm}$, and a final
@@ -493,6 +500,13 @@ provided both basis envelopes go smoothly to zero at their respective cutoffs.
 
 ## 10. Model parameters
 
+The overlap and Hamiltonian models are constructed and parameterized
+independently. The **overlap model** needs only the orbital list and its own
+bond embedding; the **Hamiltonian model** needs the orbital list, an
+environment embedding, a bond embedding, and the many-body specs. In
+particular each model owns its own bond basis — the two are fitted and
+truncated independently and need not coincide.
+
 At model-construction time the user specifies:
 
 * **Orbital list**: the sequence of shells $(nl)$ present at each species, e.g.
@@ -505,7 +519,8 @@ At model-construction time the user specifies:
   - $n_{\max}$, $l_{\max}$ — radial and angular truncations of $\phi_{nlm}$
   - $r_{\rm cut}^{\rm on}$ — environment cutoff radius
 
-* **Bond embedding** (used to embed $\mathbf r_{ji}$ in off-site features and $S_{ij}$):
+* **Bond embedding** (one per model: embeds $\mathbf r_{ji}$ in the off-site
+  $H$ features, resp. in $S_{ij}$):
   - $n_{\max}^{\rm b}$, $l_{\max}^{\rm b}$ — radial and angular truncations of
     $\phi^{\rm b}_{nlm}$
   - $r_{\rm cut}^{\rm b}$ — bond cutoff radius
@@ -541,8 +556,9 @@ Implementation notes:
 
 ## 11. Network structure
 
-The model is implemented as a [Lux.jl](https://lux.csail.mit.edu)-compatible
-neural-network layer graph. The forward pass for a single configuration is:
+Each model is implemented as its own [Lux.jl](https://lux.csail.mit.edu)-compatible
+neural-network layer graph. The forward pass of the **Hamiltonian model** for
+a single configuration is:
 
 1. **Neighbour lists**: compute the environment neighbour list (cutoff
    $r_{\rm cut}^{\rm on}$) and the bond neighbour list (cutoff
@@ -576,15 +592,18 @@ neural-network layer graph. The forward pass for a single configuration is:
    - (ii) **Off-site**: for each bond pair $(i,j)$, apply the three-way
      EquivariantTensors coupling matrix to
      $(B_i^{L_1}, B_j^{L_2}, \phi^{\rm b}_{ji})$, contract with weights,
-     and apply $\texttt{transform}_\Lambda$ to produce $H_{ij}$ and $S_{ij}$
-   - (iii) On-site overlap : analogous, but just constant
-   - (iv) Off-site overlap : analogous, built only from \phi_{nlm}^{\rm b}
-   This is a little more new and may need some iteration. 
+     and apply $\texttt{transform}_\Lambda$ to produce $H_{ij}$
+   This is a little more new and may need some iteration.
 
 Steps 3(i) and 3(ii) can run in parallel since both depend only on step 2
 outputs; steps 4(i) and 4(ii) can likewise run in parallel. The off-site
 branch (step 4(ii)) is where the equivariance machinery of §§4, 7 is
 concentrated.
+
+The **overlap model** is a far smaller, separate graph: its own bond
+neighbour list and bond embedding (steps 1–2(iii,iv) with its own radial
+basis), followed by direct assembly of $S_{ij}$ from the bond harmonics (§8)
+— no environment features, no three-way coupling; $S_{ii}$ is constant.
 
 During development decide whether 4. should be split into 4. Matrix block assembly; 5. global matrix assembly. 
 
@@ -649,7 +668,8 @@ ACEoperators.jl/
 │   ├── ACEoperators.jl          # top-level module, re-exports public API
 │   │
 │   ├── linear2c/
-│   │   ├── model.jl             # model struct, inference interface
+│   │   ├── model.jl             # Hamiltonian model struct, inference interface
+│   │   ├── overlap.jl           # standalone overlap model S (§8)
 │   │   ├── utils.jl             # neighbour list helpers, block indexing
 │   │   ├── hypers.jl            # hyper parameter defaults and heuristics 
 │   │   ├── params.jl            # model parameter juggling
@@ -670,10 +690,10 @@ Key design notes:
 - reuse ACE layers from ACEpotentials.jl / EquivariantTensors.jl / Polynomials4ML.jl wherever possible.
 - `coupling.jl` implements the wigner-eckhardt `transform_λ` step (§4) and is
   shared by on-site, off-site, and overlap models; double-check that this isn't already available in EquivariantTensors.jl, which is a more natural home
-- `model.jl` owns the final assembly loop and the post-hoc
-  symmetrization $H \leftarrow \frac{1}{2}(H + H^T)$ for now, this can be revisited, could be a separate file if it gets too long 
-- The model struct exposes a Lux.jl-compatible layer so they can be
-  composed in a standard `Chain` for the forward pass described in §11.
+- `model.jl` owns the $H$ assembly loop and the post-hoc
+  symmetrization $H \leftarrow \frac{1}{2}(H + H^T)$ for now, this can be revisited, could be a separate file if it gets too long; `overlap.jl` owns the same for $S$ 
+- Each model ($H$ and $S$) exposes its own Lux.jl-compatible layer so it can
+  be composed in a standard `Chain` for the forward passes described in §11.
 - Consider whether the structure -> neighbourlist -> graph should be part of the model or better done outside and make the graph the input to the model? 
 - during model construction add a sanity check that the hyperparameters are sensible
 - PBC are implicitly treated via the neighbourlist

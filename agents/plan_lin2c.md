@@ -6,6 +6,10 @@ This revision folds in the review comments (single graph, ACEpotentials radial
 dependency, N-way coupling via `ET.O3`, multi-species params, stop-and-test per
 stage).
 
+**Revision (2026-07-06):** `H` and `S` are **separate, independent models**
+(no single model producing the pair) — see §3.6 / §6.7. Earlier references to
+a unified `(H, S)` model are superseded.
+
 The plan is grounded in the actual APIs of the installed dependencies
 (EquivariantTensors `2d207`, ACEpotentials `nR4od`, Polynomials4ML, SpheriCart,
 WignerD, NeighbourLists, Lux). Verified call signatures are quoted inline so we
@@ -25,7 +29,7 @@ review** — the unit tests in particular are to be inspected before moving on.
 | 2 | **On-site `H_ii`** model (one-center ACE + `transform_λ`) | ACE-feature reuse, parity selection |
 | 3 | **Three-way coupling** `B_i⊗B_j⊗φ_b→Λ` in isolation + equivariance test | the off-site coupling machinery |
 | 4 | **Off-site `H_ij`** model assembled from Stage 3 | full bond model + bond-flip Hermiticity |
-| 5 | Unified `LinearH2C` model struct, hypers/heuristics, sanity checks, full §12 suite, docs | integration, UX |
+| 5 | `LinearH2C` (H-only) model struct + standalone overlap model, hypers/heuristics, sanity checks, full §12 suite, docs | integration, UX |
 
 ---
 
@@ -157,10 +161,11 @@ src/
     blocks.jl              # orbital list, block-type enumeration, λ ranges,
                            #   global index map, couple↔block helpers
     onsite.jl              # H_ii layer (§5)            [could live in model.jl]
-    offsite.jl             # H_ij + S_ij layers (§7,§8) [could live in model.jl]
+    offsite.jl             # H_ij layer (§7)            [could live in model.jl]
+    overlap.jl             # standalone overlap model S (§8)
     hypers.jl              # defaults + heuristics (§10)
     params.jl              # parameter packing/unpacking, initialisation
-    model.jl               # LinearH2C struct, Lux glue, assembly loop, symmetrize
+    model.jl               # LinearH2C (H-only) struct, Lux glue, assembly, symmetrize
 test/
   runtests.jl              # include linear2c suite
   linear2c/
@@ -168,7 +173,7 @@ test/
     test_overlap.jl        # Stage 1
     test_onsite.jl         # Stage 2
     test_offsite.jl        # Stage 4
-    test_symmetry.jl       # full §12 suite on the assembled model
+    test_symmetry.jl       # full §12 suite on the assembled H and S models
 ```
 
 ---
@@ -186,11 +191,13 @@ test/
    `mb_spec` is the union of the on-site and off-site specs (element-wise max of
    ORD / degree), resolved at construction.
 
-3. **Single graph as model input** (decided). The model's
-   `forward(G, ps, st)` takes one `ETGraph` (cutoff `r_cut^on`); a thin helper
-   `graph(model, sys)` builds it from an AtomsBase system. Bond/overlap assembly
-   filters edges to `r_cut^b`. Keeping the graph build outside the Lux layer
-   matches `mlip.jl` and lets us reuse `forces_from_edge_grads`.
+3. **Single graph as model input** (decided). Each model's
+   `forward(G, ps, st)` takes one `ETGraph`; a thin helper
+   `graph(model, sys)` builds it from an AtomsBase system. For the H model the
+   graph uses `r_cut^on` and bond assembly filters edges to `r_cut^b`; the
+   standalone overlap model needs only its own (cheaper) bond graph. Keeping
+   the graph build outside the Lux layer matches `mlip.jl` and lets us reuse
+   `forces_from_edge_grads`.
 
 4. **Hermiticity via post-hoc symmetrization** `X ← ½(X+Xᵀ)` (§7.3, §8) for all
    stages (decided — no feature-level symmetrization for now). The
@@ -203,6 +210,17 @@ test/
    indexed by species (on-site) and ordered species-pair / shell-pair type
    (off-site), even though the first working model targets single-species Si.
    `params.jl` owns this indexing so adding elements needs no structural change.
+
+6. **Separate `S` and `H` models (decided 2026-07-06).** The overlap and
+   Hamiltonian models are independent structs with independent hypers,
+   parameters, and forward passes — there is **no** single model producing the
+   pair `(H, S)`. Rationale: the initial focus is *experimentation*, where the
+   functional forms of `S` and `H` will be varied independently and may be
+   entirely unrelated; and `S` is normally much cheaper to build and fit than
+   `H`, so coupling their evaluation would force the expensive machinery onto
+   the cheap target. The models still share code-level building blocks
+   (`coupling.jl`, radial/bond embeddings, block bookkeeping) but no model
+   object. Stage 1's `OverlapModel` already follows this design.
 
 ---
 
@@ -271,17 +289,19 @@ test/
 
 ### Stage 5 — Integration, hypers, full model, docs
 * `LinearH2C` struct (§14): owns env basis, bond basis, on/off-site weight sets,
-  overlap weights, orbital list, cutoffs; Lux layer exposing
-  `forward(G, ps, st) -> (H, S)`; assembly loop + symmetrization (→ `assemble.jl`
-  if `model.jl` grows past ~300 lines).
+  orbital list, cutoffs; Lux layer exposing `forward(G, ps, st) -> H`;
+  assembly loop + symmetrization (→ `assemble.jl` if `model.jl` grows past
+  ~300 lines). The overlap model remains the separate `OverlapModel` (Stage 1)
+  with its own `forward -> S` — no combined `(H, S)` model (§3.6).
 * `hypers.jl`/`params.jl`: defaults + heuristics (§10); auto-resolve `L_max`,
   union `mb_spec`, `l_max^b ≥ l_max^orb` check, `r_cut^b ≤ r_cut^on` default
   coincidence, construction-time sanity checks (§14). Multi-species parameter
   layout throughout.
-* `test_symmetry.jl`: the §12 suite (minus translation, §5) on the *full*
-  `(H,S)` model, including cutoff-smoothness `C^p` across `r_cut^b`/`r_cut^on`.
+* `test_symmetry.jl`: the §12 suite (minus translation, §5) on the full `H`
+  model and the standalone `S` model separately, including cutoff-smoothness
+  `C^p` across `r_cut^b`/`r_cut^on`.
 * Minimal docs/example mirroring `examples/atoms/mlip.jl` (small Si system,
-  assemble `H,S`, run the symmetry checks).
+  assemble `H` and `S` with their respective models, run the symmetry checks).
 * **Stop, run tests, hand back.**
 
 ---
@@ -322,6 +342,9 @@ H_rot = assemble(rotate(sys, Q));   @test H_rot ≈ 𝓓 * H * 𝓓'
 5. **Hermiticity:** post-hoc symmetrization only. (§3.4)
 6. **Multi-species:** first model is single-species Si, but parameter handling is
    multi-species from the start. (§3.5)
+7. **Separate `S` and `H` models** (2026-07-06): independent structs, hypers,
+   parameters, and forward passes; shared building blocks only. Motivated by
+   experimentation with unrelated forms and the much lower cost of `S`. (§3.6)
 
 ---
 
