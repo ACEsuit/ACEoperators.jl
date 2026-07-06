@@ -462,6 +462,13 @@ Nigam *et al.*, eqs. (10)-(11) — in our case we only need the $\nu = 0$
 ("zero-neighbour"), pure-bond level, since $S$ has no environment-dependence
 to capture.
 
+*Implementation note.* Nothing in this construction is specific to the
+overlap: it is a linear model of a **generic** purely-geometric two-center
+quantity (a generalized Slater–Koster table). It is therefore implemented as
+the generic, purely off-site `TwoCenterModel` (`src/linear2c/twocenter.jl`);
+callers add the on-site term their target requires — for an orthonormal
+orbital basis, $S = I + \texttt{assemble}(\text{model}, \dots)$.
+
 ## 9. Two independent basis sets and cutoffs
 
 The model has two entirely separate one-particle bases, each with its own
@@ -669,7 +676,7 @@ ACEoperators.jl/
 │   │
 │   ├── linear2c/
 │   │   ├── model.jl             # Hamiltonian model struct, inference interface
-│   │   ├── overlap.jl           # standalone overlap model S (§8)
+│   │   ├── twocenter.jl         # generic bond-only 2C model; overlap S = I + 2C (§8)
 │   │   ├── utils.jl             # neighbour list helpers, block indexing
 │   │   ├── hypers.jl            # hyper parameter defaults and heuristics 
 │   │   ├── params.jl            # model parameter juggling
@@ -683,7 +690,7 @@ ACEoperators.jl/
 |       ├── test_symmetry.jl         # all symmetry tests from §12
 |       ├── test_onsite.jl
 |       ├── test_offsite.jl
-|       └── test_overlap.jl
+|       └── test_twocenter.jl
 ```
 
 Key design notes:
@@ -691,7 +698,7 @@ Key design notes:
 - `coupling.jl` implements the wigner-eckhardt `transform_λ` step (§4) and is
   shared by on-site, off-site, and overlap models; double-check that this isn't already available in EquivariantTensors.jl, which is a more natural home
 - `model.jl` owns the $H$ assembly loop and the post-hoc
-  symmetrization $H \leftarrow \frac{1}{2}(H + H^T)$ for now, this can be revisited, could be a separate file if it gets too long; `overlap.jl` owns the same for $S$ 
+  symmetrization $H \leftarrow \frac{1}{2}(H + H^T)$ for now, this can be revisited, could be a separate file if it gets too long; `twocenter.jl` owns the same for the 2C model 
 - Each model ($H$ and $S$) exposes its own Lux.jl-compatible layer so it can
   be composed in a standard `Chain` for the forward passes described in §11.
 - Consider whether the structure -> neighbourlist -> graph should be part of the model or better done outside and make the graph the input to the model? 

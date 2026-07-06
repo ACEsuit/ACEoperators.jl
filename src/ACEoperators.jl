@@ -6,9 +6,10 @@ module ACEoperators
 
 import Random
 import ACEpotentials
+import NeighbourLists    # activates EquivariantTensors' graph extension
 
 include("linear2c/coupling.jl")   # Wigner-Eckart recoupling, transform_λ (§4)
 include("linear2c/blocks.jl")     # orbital list + global block bookkeeping (§10)
-include("linear2c/overlap.jl")    # two-center overlap model S (§8, Stage 1)
+include("linear2c/twocenter.jl")  # generic bond-only 2C model (used for S, §8)
 
 end

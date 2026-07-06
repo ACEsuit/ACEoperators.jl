@@ -5,7 +5,7 @@ using Test
    @testset "linear2c/coupling" begin
       include("linear2c/test_coupling.jl")
    end
-   @testset "linear2c/overlap" begin
-      include("linear2c/test_overlap.jl")
+   @testset "linear2c/twocenter" begin
+      include("linear2c/test_twocenter.jl")
    end
 end

@@ -7,19 +7,25 @@ version = "1.0.0-DEV"
 ACEpotentials = "3b96b61c-0fcc-4693-95ed-1ef9f35fcc53"
 EquivariantTensors = "5e107534-7145-4f8f-b06f-47a52840c895"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NeighbourLists = "2fcf5ba9-9ed4-57cf-b73f-ff513e316b9c"
 Polynomials4ML = "03c4bcba-a943-47e9-bfa1-b1661fc2974f"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 ACEpotentials = "0.10"
 EquivariantTensors = "0.4"
+NeighbourLists = "0.5"
 Polynomials4ML = "0.5"
 StaticArrays = "1"
+Unitful = "1"
 julia = "1.11"
 
 [extras]
+AtomsBase = "a963bdd2-2df7-4f54-a1ee-49d51e6be12a"
+AtomsBuilder = "f5cc8831-eeb7-4288-8d9f-d6c1ddb77004"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["AtomsBase", "AtomsBuilder", "Test"]

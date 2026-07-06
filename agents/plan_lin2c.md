@@ -25,7 +25,7 @@ review** — the unit tests in particular are to be inspected before moving on.
 | Stage | Deliverable | Main risk retired |
 |-------|-------------|-------------------|
 | 0 ✅ | scaffolding, `coupling.jl` (`transform_λ`), block index bookkeeping | CG/Wigner-Eckart conventions |
-| 1 ✅ | **Overlap `S`** model (on-site const + off-site bond-only) end-to-end, with rotation/inversion/Hermiticity tests | graph→bond-embedding→block-assembly→symmetrize loop |
+| 1 ✅ | generic bond-only **`TwoCenterModel`** (→ **overlap `S = I + 2C`**) end-to-end, graph/PBC input, with rotation/inversion/Hermiticity tests | graph→bond-embedding→block-assembly→symmetrize loop |
 | 2 | **On-site `H_ii`** model (one-center ACE + `transform_λ`) | ACE-feature reuse, parity selection |
 | 3 | **Three-way coupling** `B_i⊗B_j⊗φ_b→Λ` in isolation + equivariance test | the off-site coupling machinery |
 | 4 | **Off-site `H_ij`** model assembled from Stage 3 | full bond model + bond-flip Hermiticity |
@@ -162,7 +162,7 @@ src/
                            #   global index map, couple↔block helpers
     onsite.jl              # H_ii layer (§5)            [could live in model.jl]
     offsite.jl             # H_ij layer (§7)            [could live in model.jl]
-    overlap.jl             # standalone overlap model S (§8)
+    twocenter.jl           # generic bond-only 2C model (overlap S = I + 2C, §8)
     hypers.jl              # defaults + heuristics (§10)
     params.jl              # parameter packing/unpacking, initialisation
     model.jl               # LinearH2C (H-only) struct, Lux glue, assembly, symmetrize
@@ -170,7 +170,7 @@ test/
   runtests.jl              # include linear2c suite
   linear2c/
     test_coupling.jl       # transform_λ round-trip + 3-way coupling equivariance
-    test_overlap.jl        # Stage 1
+    test_twocenter.jl      # Stage 1
     test_onsite.jl         # Stage 2
     test_offsite.jl        # Stage 4
     test_symmetry.jl       # full §12 suite on the assembled H and S models
@@ -220,7 +220,10 @@ test/
    `H`, so coupling their evaluation would force the expensive machinery onto
    the cheap target. The models still share code-level building blocks
    (`coupling.jl`, radial/bond embeddings, block bookkeeping) but no model
-   object. Stage 1's `OverlapModel` already follows this design.
+   object. Stage 1 delivers this as the **generic bond-only `TwoCenterModel`**
+   (`twocenter.jl`): it assembles the purely off-site two-center matrix of ANY
+   single-bond quantity; callers add their own on-site term (overlap:
+   `S = I + assemble(model, …)`).
 
 ---
 
@@ -238,18 +241,26 @@ test/
   random block; CG ranges `|l−l'|≤λ≤l+l'`; parity sign `(-1)^{l+l'+λ}`.
 * **Stop, run tests, hand back.**
 
-### Stage 1 — Overlap `S` (§8)  ← simplest full pipeline
-* Single graph (§3.3); bond basis `φ^b_{nlm}(r_ji) = R^b_{nl}(r) Y_{lm}(r̂)` via
-  §1.3 EdgeEmbed on edges filtered to `r_cut^b`, radial via
-  `ACEpotentials.Models` (§1.4). (At Stage 1 begin, also look up the N-way
-  `O3.coupling_coeffs` usage from §1.2/§1.5 so Stage 3 is de-risked early.)
+### Stage 1 — generic 2C model / overlap `S` (§8)  ← simplest full pipeline
+* Delivered as the generic bond-only `TwoCenterModel` (§3.6): purely off-site
+  assembly, `S = I + assemble(model, …)`.
+* Graph input (§3.3): `assemble(model, G::ETGraph, W)` via
+  `ET.Atoms.interaction_graph` (NeighbourLists-backed, PBC included;
+  periodic-image bonds — including self-images — accumulate into the same
+  block, Γ-point convention). A brute-force `bondlist` path is retained as
+  the free-cluster cross-check. **Deviation (recorded):** the bond basis
+  `φ^b_{nlm}(r_ji) = R^b_{nl}(r) Y_{lm}(r̂)` is evaluated directly per edge
+  rather than through §1.3 `EdgeEmbed` (whose pooled layout targets the env
+  basis); radial via `ACEpotentials.Models` (§1.4). Lux-layer glue is Stage-5
+  scope. (At Stage 1 begin, also look up the N-way `O3.coupling_coeffs`
+  usage from §1.2/§1.5 so Stage 3 is de-risked early.)
 * Off-site: for each ordered shell pair `(nl,n'l')` and admissible `Λ`, contract
   bond harmonics `φ^b_{·Λ·}` (so `l_q=Λ`, no internal CG — §8) with scalar
   weights `u^{(nl,n'l';Λ)}` (species-pair indexed), then `transform_Λ` →
   `(m,m')` block.
 * On-site `S_ii`: identity or fixed Gram (no learning).
 * Assemble full `S`, then `S ← ½(S+Sᵀ)`.
-* **Tests (`test_overlap.jl`):** rotation, inversion (+parity signs),
+* **Tests (`test_twocenter.jl`):** rotation, inversion (+parity signs),
   Hermiticity, permutation, cutoff smoothness — restricted to `S`.
   Equivariance pattern: rotate the system, rebuild `S`, compare to
   `𝓓(Q) S 𝓓(Q)ᵀ`, `𝓓 = blockdiag(D^{l}(Q))` from `O3.D_from_angles`.
@@ -291,8 +302,8 @@ test/
 * `LinearH2C` struct (§14): owns env basis, bond basis, on/off-site weight sets,
   orbital list, cutoffs; Lux layer exposing `forward(G, ps, st) -> H`;
   assembly loop + symmetrization (→ `assemble.jl` if `model.jl` grows past
-  ~300 lines). The overlap model remains the separate `OverlapModel` (Stage 1)
-  with its own `forward -> S` — no combined `(H, S)` model (§3.6).
+  ~300 lines). The overlap model remains the separate `TwoCenterModel`
+  (Stage 1, `S = I + assemble`) — no combined `(H, S)` model (§3.6).
 * `hypers.jl`/`params.jl`: defaults + heuristics (§10); auto-resolve `L_max`,
   union `mb_spec`, `l_max^b ≥ l_max^orb` check, `r_cut^b ≤ r_cut^on` default
   coincidence, construction-time sanity checks (§14). Multi-species parameter
