@@ -1,5 +1,5 @@
 #
-# coupling.jl — Wigner–Eckart recoupling for matrix blocks (§4)
+# wignereckart.jl — Wigner–Eckart recoupling for matrix blocks (§4)
 #
 # Implements the `transform_λ` step that converts equivariant (coupled) features
 # X^{λμ} into an (l,m;l',m') matrix block and back, using the real-spherical-
@@ -21,7 +21,7 @@
 # dependent off-site blocks with genuine axial/chiral geometry, which the
 # real-CG ACE features cannot form.
 #
-# Construction (verified numerically, see test_coupling.jl):
+# Construction (verified numerically, see test_wignereckart.jl):
 #   * Start from the COMPLEX CG block  Cc[μ,m,m'] = ⟨l m; l' m' | λ μ⟩  (all λ,
 #     all parities nonzero), which intertwines  Dc^l X (Dc^{l'})ᵀ ↔ Dc^λ v.
 #   * Map to the real basis via the vector law  v_real = Ctran(l) · v_complex
@@ -37,8 +37,8 @@
 # transforms as  X ↦ D^l(Q) X D^{l'}(Q)ᵀ  and a coupled component as v ↦ D^λ v,
 # all with `O3.D_from_angles(·, real)`.
 #
-# This file currently lives in ACEoperators; it is a candidate for upstreaming
-# into EquivariantTensors once stable (see agents/plan_lin2c.md §1.5).
+# This file currently lives in ACEoperators.Transforms; it is a candidate for
+# upstreaming into EquivariantTensors once stable (see agents/plan_lin2c.md §1.5).
 #
 
 using EquivariantTensors: O3
