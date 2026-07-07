@@ -1,5 +1,5 @@
 module Transforms
 
-include("transforms/wignereckart.jl")
+include("wignereckart.jl")
 
 end

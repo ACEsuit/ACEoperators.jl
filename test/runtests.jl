@@ -2,7 +2,7 @@ using ACEoperators
 using Test
 
 @testset "ACEoperators.jl" begin
-   @testset "linear2c/coupling" begin
-      include("linear2c/test_coupling.jl")
+   @testset "transforms/wignereckart" begin
+      include("transforms/test_wignereckart.jl")
    end
 end

@@ -21,7 +21,7 @@
 # dependent off-site blocks with genuine axial/chiral geometry, which the
 # real-CG ACE features cannot form.
 #
-# Construction (verified numerically, see test_coupling.jl):
+# Construction (verified numerically, see test_wignereckart.jl):
 #   * Start from the COMPLEX CG block  Cc[μ,m,m'] = ⟨l m; l' m' | λ μ⟩  (all λ,
 #     all parities nonzero), which intertwines  Dc^l X (Dc^{l'})ᵀ ↔ Dc^λ v.
 #   * Map to the real basis via the vector law  v_real = Ctran(l) · v_complex

@@ -1,20 +1,31 @@
 name = "ACEoperators"
 uuid = "f748c086-19e7-4251-9691-49e5d84e2a35"
-authors = ["Christoph Ortner <christophortner0@gmail.com>"]
-version = "1.0.0-DEV"
+version = "0.0.1-DEV"
 
 [deps]
+ACEbase = "14bae519-eb20-449c-a949-9c58ed33163e"
 EquivariantTensors = "5e107534-7145-4f8f-b06f-47a52840c895"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
+Polynomials4ML = "03c4bcba-a943-47e9-bfa1-b1661fc2974f"
+SpheriCart = "5caf2b29-02d9-47a3-9434-5931c85ba645"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[sources]
+EquivariantTensors = {path = "../EquivariantTensors.jl"}
+
 [compat]
-EquivariantTensors = "0.4, 0.5"
+ACEbase = "0.4.8"
+EquivariantTensors = "0.5, 0.6"
+LuxCore = "1.5.3"
+Polynomials4ML = "0.6.1"
+SpheriCart = "0.3.2"
 StaticArrays = "1"
 julia = "1.11"
 
 [extras]
+ACETestUtils = "b973b150-f408-4aa5-b6a2-f0e33df46af3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["ACETestUtils", "Test"]

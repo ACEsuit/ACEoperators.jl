@@ -16,8 +16,8 @@
 
 using Test, LinearAlgebra
 using EquivariantTensors: O3
-using ACEoperators: BlockCoupling, couple, decouple, transform_λ, transform_λ!,
-                    cg_block, channel_parity
+using ACEoperators.Transforms: BlockCoupling, couple, decouple, transform_λ,
+                    transform_λ!, cg_block, channel_parity
 
 ##
 
