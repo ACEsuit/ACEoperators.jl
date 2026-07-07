@@ -1,5 +1,5 @@
 #
-# coupling.jl — Wigner–Eckart recoupling for matrix blocks (§4)
+# wignereckart.jl — Wigner–Eckart recoupling for matrix blocks (§4)
 #
 # Implements the `transform_λ` step that converts equivariant (coupled) features
 # X^{λμ} into an (l,m;l',m') matrix block and back, using the real-spherical-
@@ -37,8 +37,8 @@
 # transforms as  X ↦ D^l(Q) X D^{l'}(Q)ᵀ  and a coupled component as v ↦ D^λ v,
 # all with `O3.D_from_angles(·, real)`.
 #
-# This file currently lives in ACEoperators; it is a candidate for upstreaming
-# into EquivariantTensors once stable (see agents/plan_lin2c.md §1.5).
+# This file currently lives in ACEoperators.Transforms; it is a candidate for
+# upstreaming into EquivariantTensors once stable (see agents/plan_lin2c.md §1.5).
 #
 
 using EquivariantTensors: O3
